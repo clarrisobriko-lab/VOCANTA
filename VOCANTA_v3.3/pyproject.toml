@@ -1,0 +1,35 @@
+[build-system]
+requires = ["setuptools>=70"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "vocanta"
+version = "3.3.0"
+description = "Production job discovery, intelligence and controlled application automation"
+requires-python = ">=3.12"
+dependencies = [
+  "requests>=2.32,<3",
+  "rich>=13.9,<15",
+  "playwright>=1.53,<2",
+  "keyring>=25,<26",
+  "python-docx>=1.1,<2",
+  "google-auth>=2.35,<3",
+  "google-auth-oauthlib>=1.2,<2",
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
+addopts = "-ra"
+
+[tool.setuptools]
+py-modules = [
+  "main", "tracker", "analytics", "history", "backup", "migrate_previous",
+  "filter_jobs", "daily_summary", "repair_history", "statistics",
+  "application_center", "setup_profile", "automated_apply", "automation_report",
+  "mission_briefing", "employer_memory", "setup_email", "morning_brief",
+  "action_centre", "retry_email_outbox", "stream_automation", "employer_boards"
+]
+
+[tool.setuptools.packages.find]
+include = ["agents*", "automation*", "config*", "connectors*", "core*", "intelligence*", "notifications*"]

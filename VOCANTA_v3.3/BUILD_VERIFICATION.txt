@@ -1,0 +1,14 @@
+VOCANTA 3.3 BUILD VERIFICATION
+
+Baseline: VOCANTA RC1
+Release: VOCANTA 3.3.0
+
+Verified:
+- 130 tests passed
+- 13 unittest subtests passed
+- Python compilation passed
+- Employer registry fails closed
+- Canonical disabled before network fetch
+- Only approved Greenhouse employer boards are queried
+- Employer role-focus filtering occurs before discovery persistence
+- One controlled Greenhouse application policy retained

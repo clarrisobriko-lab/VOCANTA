@@ -1,0 +1,36 @@
+{
+  "schema_version": 1,
+  "policy": "Greenhouse is an ATS platform, not a single source. Only explicitly approved employer boards may be scouted.",
+  "employers": [
+    {
+      "company": "Canonical",
+      "board": "canonical",
+      "enabled": false,
+      "automation_supported": true,
+      "reason": "Engineering-dominated board. Disabled at source to prevent high-volume irrelevant scouting.",
+      "role_focus": [],
+      "international_hiring": "mixed",
+      "sponsorship": "unknown"
+    },
+    {
+      "company": "Remote",
+      "board": "remotecom",
+      "enabled": true,
+      "automation_supported": true,
+      "reason": "Approved employer board with globally distributed hiring and direct Greenhouse applications.",
+      "role_focus": [
+        "administrative assistant",
+        "executive assistant",
+        "human resources",
+        "hr assistant",
+        "people operations",
+        "recruitment coordinator",
+        "operations coordinator",
+        "legal assistant",
+        "compliance"
+      ],
+      "international_hiring": "likely",
+      "sponsorship": "unknown"
+    }
+  ]
+}

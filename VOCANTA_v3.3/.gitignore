@@ -1,0 +1,17 @@
+__pycache__/
+*.pyc
+data/*.db
+logs/*.log
+exports/*.csv
+
+application_workspace/
+data/.migration_complete
+data/applicant_profile.json
+data/browser_profile/
+exports/automation_screenshots/
+
+application_workspace/tailored/
+
+data/email_settings.json
+data/google_oauth_client.json
+exports/email_outbox/

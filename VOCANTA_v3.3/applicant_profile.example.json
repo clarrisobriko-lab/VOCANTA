@@ -1,0 +1,80 @@
+{
+  "first_name": "First",
+  "last_name": "Last",
+  "email": "applicant@example.com",
+  "phone": "+000000000000",
+  "city": "City",
+  "country": "Nigeria",
+  "address": "",
+  "postal_code": "",
+  "linkedin_url": "",
+  "website_url": "",
+  "work_authorization": "No, I require employer sponsorship",
+  "requires_sponsorship": true,
+  "notice_period": "Immediately available",
+  "salary_expectation": "",
+  "resume_path": "assets/master_cv.docx",
+  "cover_letter_path": "assets/master_cover_letter.docx",
+  "supporting_document_path": "assets/executive_assistant_certificate.pdf",
+  "middle_name": "",
+  "nationality": "Nigerian",
+  "region": "Africa",
+  "current_location": "Abuja, Nigeria",
+  "open_to_relocation": true,
+  "remote_preference": "Remote preferred",
+  "preferred_countries": [
+    "United Kingdom",
+    "Ireland",
+    "Portugal",
+    "Estonia",
+    "Latvia",
+    "Lithuania"
+  ],
+  "travel_commitment": "Yes",
+  "number_of_employers": "4",
+  "highest_education": {
+    "institution": "University of Uyo",
+    "degree": "Bachelor of Laws (LLB)",
+    "discipline": "Law",
+    "graduation_year": "2020",
+    "country": "Nigeria"
+  },
+  "employment_history": [
+    {
+      "title": "Human Resources Manager",
+      "employer": "",
+      "start_year": "",
+      "end_year": "",
+      "current": true,
+      "summary": ""
+    },
+    {
+      "title": "Legal Officer",
+      "employer": "",
+      "start_year": "",
+      "end_year": "",
+      "current": false,
+      "summary": ""
+    },
+    {
+      "title": "Legal Associate",
+      "employer": "",
+      "start_year": "",
+      "end_year": "",
+      "current": false,
+      "summary": ""
+    },
+    {
+      "title": "Executive and administrative support",
+      "employer": "",
+      "start_year": "",
+      "end_year": "",
+      "current": false,
+      "summary": ""
+    }
+  ],
+  "standard_answers": {},
+  "demographics": {},
+  "auto_fill_demographics": false,
+  "privacy_acknowledgements": true
+}
