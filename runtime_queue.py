@@ -1,7 +1,7 @@
+from automation.acquisition_audit import AcquisitionAuditStore, reconcile_application_outcome
 from automation.application_pipeline import run_application_pipeline
 from automation.profile import load_profile
 from config.settings import AUTOMATION_MAX_APPLICATIONS_PER_RUN, AUTOMATION_MINIMUM_SCORE
-from core.acquisition_audit import record_acquisition_result, reconcile_application_outcome
 from core.database import Database
 from core.models import Job
 
@@ -21,11 +21,14 @@ def process_runtime_queue(database: Database, profile, *, pipeline=run_applicati
         minimum_score=AUTOMATION_MINIMUM_SCORE,
         limit=AUTOMATION_MAX_APPLICATIONS_PER_RUN,
     )
+    audit = AcquisitionAuditStore(database)
     submitted = 0
     for row in candidates:
         job = row_to_job(row)
         result = pipeline(job, row["id"], profile)
-        record_acquisition_result(database, row["id"], result)
+        package_path = str(result.package.archive) if result.package is not None else ""
+        automation_status = result.automation.status if result.automation is not None else ""
+        audit.record(row["id"], result.decision, package_path=package_path, automation_status=automation_status)
 
         if not result.decision.should_apply:
             database.record_queue_audit(row["id"], "ATS_PIPELINE", "REJECTED", result.decision.reason)
