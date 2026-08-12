@@ -23,55 +23,24 @@ class ATSAdapter:
 
 
 ADAPTERS = (
+    ATSAdapter("GREENHOUSE", ("greenhouse.io", "greenhouse.com"), ("submit application", "submit"), STANDARD_CONFIRMATIONS, True),
+    ATSAdapter("LEVER", ("lever.co",), ("submit application", "submit"), STANDARD_CONFIRMATIONS, True),
+    ATSAdapter("ASHBY", ("ashbyhq.com",), ("submit application", "submit"), STANDARD_CONFIRMATIONS + ("application received", "we'll be in touch"), True),
     ATSAdapter(
-        name="GREENHOUSE",
-        host_markers=("greenhouse.io", "greenhouse.com"),
-        final_submit_texts=("submit application", "submit"),
-        confirmation_phrases=STANDARD_CONFIRMATIONS,
-        auto_submit_allowed=True,
+        "SMARTRECRUITERS",
+        ("smartrecruiters.com",),
+        ("submit application", "send application", "apply"),
+        STANDARD_CONFIRMATIONS + ("application successfully submitted", "your application has been submitted"),
+        True,
     ),
-    ATSAdapter(
-        name="LEVER",
-        host_markers=("lever.co",),
-        final_submit_texts=("submit application", "submit"),
-        confirmation_phrases=STANDARD_CONFIRMATIONS,
-        auto_submit_allowed=True,
-    ),
-    ATSAdapter(
-        name="ASHBY",
-        host_markers=("ashbyhq.com",),
-        final_submit_texts=("submit application", "submit"),
-        confirmation_phrases=STANDARD_CONFIRMATIONS + (
-            "application received",
-            "we'll be in touch",
-        ),
-        auto_submit_allowed=True,
-    ),
-    ATSAdapter(
-        name="SMARTRECRUITERS",
-        host_markers=("smartrecruiters.com",),
-        final_submit_texts=("submit application", "send application"),
-        confirmation_phrases=STANDARD_CONFIRMATIONS,
-        auto_submit_allowed=False,
-    ),
-    ATSAdapter(
-        name="WORKDAY",
-        host_markers=("workday.com", "myworkdayjobs.com"),
-        final_submit_texts=("submit",),
-        confirmation_phrases=STANDARD_CONFIRMATIONS,
-        auto_submit_allowed=False,
-    ),
+    ATSAdapter("WORKDAY", ("workday.com", "myworkdayjobs.com"), ("submit",), STANDARD_CONFIRMATIONS, False),
 )
 
 
 GENERIC_ADAPTER = ATSAdapter(
     name="GENERIC",
     host_markers=(),
-    final_submit_texts=(
-        "submit application",
-        "send application",
-        "complete application",
-    ),
+    final_submit_texts=("submit application", "send application", "complete application"),
     confirmation_phrases=STANDARD_CONFIRMATIONS,
     auto_submit_allowed=False,
 )
