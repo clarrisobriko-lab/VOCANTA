@@ -21,15 +21,12 @@ class LeverProductionTests(unittest.TestCase):
         self.assertIn("Lever", names)
         self.assertIn("Greenhouse", names)
         self.assertIn("Ashby", names)
+        self.assertIn("SmartRecruiters", names)
 
-    def test_unpromoted_ats_stays_blocked(self):
-        for url, expected in (
-            ("https://jobs.smartrecruiters.com/example/abc123", "SMARTRECRUITERS"),
-            ("https://example.wd5.myworkdayjobs.com/job/abc123", "WORKDAY"),
-        ):
-            decision = assess_application_url(url)
-            self.assertFalse(decision.allowed)
-            self.assertEqual(decision.ats, expected)
+    def test_workday_stays_blocked(self):
+        decision = assess_application_url("https://example.wd5.myworkdayjobs.com/job/abc123")
+        self.assertFalse(decision.allowed)
+        self.assertEqual(decision.ats, "WORKDAY")
 
     def test_generic_form_stays_blocked(self):
         decision = assess_application_url("https://careers.example.com/jobs/abc123")
