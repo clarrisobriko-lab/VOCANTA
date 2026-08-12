@@ -20,14 +20,23 @@ class ATSMatchTests(unittest.TestCase):
     def test_unsupported_tool_is_reported_as_gap(self):
         job = Job(
             "Example", "Executive Assistant", "Remote", "test", "https://example.com",
-            description="Manage executive diaries, leadership meetings and Zoom video conferencing",
+            description="Manage executive diaries, leadership meetings and Salesforce CRM records",
         )
         result = analyse_ats_match(job)
         self.assertIn("executive support", result.matched_skills)
         self.assertIn("calendar management", result.matched_skills)
         self.assertIn("scheduling", result.matched_skills)
-        self.assertIn("zoom", result.missing_skills)
+        self.assertIn("salesforce", result.missing_skills)
         self.assertLess(result.score, 100)
+
+    def test_verified_remote_tools_are_not_false_gaps(self):
+        job = Job(
+            "Example", "Executive Assistant", "Remote", "test", "https://example.com",
+            description="Coordinate meetings using Zoom and collaborate through Slack",
+        )
+        result = analyse_ats_match(job)
+        self.assertNotIn("zoom", result.missing_skills)
+        self.assertNotIn("slack", result.missing_skills)
 
     def test_no_detected_requirements_is_neutral_not_failure(self):
         job = Job("Example", "Coordinator", "Remote", "test", "https://example.com", description="Support the team")
