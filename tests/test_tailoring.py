@@ -2,8 +2,15 @@ import tempfile
 import unittest
 from pathlib import Path
 
+from docx import Document
+
 from automation.profile import ApplicantProfile
-from automation.tailoring import classify_job, extract_keywords, tailor_documents
+from automation.tailoring import (
+    CATEGORY_HEADLINES,
+    classify_job,
+    extract_keywords,
+    tailor_documents,
+)
 from core.models import Job
 
 
@@ -47,6 +54,31 @@ class TailoringTests(unittest.TestCase):
                 self.assertTrue(docs.resume_path.is_file())
                 self.assertTrue(docs.cover_letter_path.is_file())
                 self.assertTrue(docs.certificate_path.is_file())
+            finally:
+                module.TAILORED_APPLICATIONS_DIR = old
+
+    def test_cv_headline_matches_job_category(self):
+        cases = (
+            ("Executive Assistant", "Executive support and scheduling", "EXECUTIVE_OPERATIONS"),
+            ("Human Resources Manager", "Recruitment, onboarding and employee relations", "HR_PEOPLE"),
+            ("Legal Counsel", "Legal research, contracts and compliance", "LEGAL_COMPLIANCE"),
+            ("Programme Officer", "Humanitarian nonprofit programme coordination", "NGO_PROGRAMME"),
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            profile = self.profile(root)
+            import automation.tailoring as module
+            old = module.TAILORED_APPLICATIONS_DIR
+            module.TAILORED_APPLICATIONS_DIR = root / "out"
+            try:
+                for job_id, (title, description, expected_category) in enumerate(cases, start=1):
+                    with self.subTest(category=expected_category):
+                        job = Job("Example", title, "Remote", "test", "https://example.com", description=description)
+                        docs = tailor_documents(job, job_id, profile)
+                        self.assertEqual(docs.category, expected_category)
+                        document = Document(docs.resume_path)
+                        text = "\n".join(paragraph.text for paragraph in document.paragraphs)
+                        self.assertIn(CATEGORY_HEADLINES[expected_category], text)
             finally:
                 module.TAILORED_APPLICATIONS_DIR = old
 
