@@ -28,7 +28,7 @@ CATEGORY_TERMS = {
     "NGO_PROGRAMME": ("ngo", "charity", "foundation", "humanitarian", "human rights", "programme officer", "nonprofit", "non-profit", "refugee"),
 }
 CATEGORY_HEADLINES = {"EXECUTIVE_OPERATIONS": "EXECUTIVE OPERATIONS AND ADMINISTRATIVE SPECIALIST", "HR_PEOPLE": "HUMAN RESOURCES AND PEOPLE OPERATIONS PROFESSIONAL", "LEGAL_COMPLIANCE": "LEGAL, COMPLIANCE AND OPERATIONS PROFESSIONAL", "NGO_PROGRAMME": "PROGRAMME, OPERATIONS AND NONPROFIT SUPPORT PROFESSIONAL"}
-SKILL_KEYWORDS = ("executive support", "calendar management", "email management", "stakeholder management", "project coordination", "workflow management", "administrative support", "operations", "recruitment", "onboarding", "employee relations", "human resources", "people operations", "documentation", "records management", "client communication", "compliance", "legal research", "contract management", "policy", "google workspace", "microsoft office", "slack", "zoom", "confidential information", "reporting", "scheduling", "training")
+SKILL_KEYWORDS = ("executive support", "calendar management", "email management", "stakeholder management", "project coordination", "workflow management", "administrative support", "operations", "recruitment", "onboarding", "employee relations", "human resources", "people operations", "documentation", "records management", "client communication", "compliance", "legal research", "contract management", "policy", "google workspace", "microsoft office", "slack", "zoom", "salesforce", "workday", "confidential information", "reporting", "scheduling", "training")
 SEMANTIC_SKILL_GROUPS = {
     "executive support": ("executive support", "support executives", "support senior leadership", "c-suite support", "leadership support", "executive diaries", "senior leadership meetings"),
     "calendar management": ("calendar management", "calendar coordination", "manage calendars", "diary management", "diary coordination", "executive diaries", "manage diaries"),
@@ -50,7 +50,10 @@ SEMANTIC_SKILL_GROUPS = {
     "policy": ("policy", "policy development", "policy implementation", "policy review"),
     "google workspace": ("google workspace", "google suite", "g suite"),
     "microsoft office": ("microsoft office", "microsoft 365", "ms office", "office 365"),
-    "slack": ("slack",), "zoom": ("zoom", "video conferencing"),
+    "slack": ("slack",),
+    "zoom": ("zoom", "video conferencing"),
+    "salesforce": ("salesforce", "salesforce crm"),
+    "workday": ("workday", "workday hcm"),
     "confidential information": ("confidential information", "sensitive information", "confidential records", "data confidentiality"),
     "reporting": ("reporting", "management reports", "report preparation", "prepare reports"),
     "scheduling": ("scheduling", "schedule management", "appointment scheduling", "meeting coordination", "coordinate meetings", "leadership meetings"),
