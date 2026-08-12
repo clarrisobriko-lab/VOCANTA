@@ -42,6 +42,20 @@ class TailoringTests(unittest.TestCase):
         job = Job("Example", "Operations Coordinator", "Remote", "test", "https://example.com", description="Calendar management and stakeholder management")
         self.assertIn("calendar management", extract_keywords(job))
 
+    def test_semantic_keyword_synonyms_are_normalised(self):
+        cases = (
+            ("Manage complex executive diaries and coordinate senior leadership meetings", ("executive support", "calendar management", "scheduling")),
+            ("Own talent acquisition, new hire orientation and workplace relations", ("recruitment", "onboarding", "employee relations")),
+            ("Perform contract review, regulatory compliance and legal analysis", ("contract management", "compliance", "legal research")),
+            ("Prepare management reports using Microsoft 365 and G Suite", ("reporting", "microsoft office", "google workspace")),
+        )
+        for description, expected in cases:
+            with self.subTest(description=description):
+                job = Job("Example", "Specialist", "Remote", "test", "https://example.com", description=description)
+                matches = extract_keywords(job)
+                for keyword in expected:
+                    self.assertIn(keyword, matches)
+
     def test_documents_are_created(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
