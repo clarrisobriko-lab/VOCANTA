@@ -35,30 +35,32 @@ CATEGORY_HEADLINES = {
 }
 SEMANTIC_SKILL_GROUPS = {
     "executive support": ("executive support", "support executives", "support senior leadership", "c-suite support", "leadership support", "executive diaries", "senior leadership meetings"),
-    "calendar management": ("calendar management", "calendar coordination", "manage calendars", "diary management", "diary coordination", "executive diaries", "manage diaries"),
-    "email management": ("email management", "inbox management", "manage inbox", "correspondence management"),
-    "stakeholder management": ("stakeholder management", "stakeholder engagement", "stakeholder relations", "relationship management"),
+    "calendar management": ("calendar management", "calendar coordination", "manage calendars", "diary management", "diary coordination", "executive diaries", "manage diaries", "calendars"),
+    "email management": ("email management", "inbox management", "manage inbox", "correspondence management", "correspondence"),
+    "stakeholder management": ("stakeholder management", "stakeholder engagement", "stakeholder relations", "relationship management", "stakeholder"),
     "project coordination": ("project coordination", "project management", "coordinate projects", "programme coordination", "program coordination"),
     "workflow management": ("workflow management", "process coordination", "workflow coordination", "process improvement"),
-    "administrative support": ("administrative support", "administration support", "office administration", "business support"),
+    "administrative support": ("administrative support", "administration support", "office administration", "business support", "administrative"),
     "recruitment": ("recruitment", "recruiting", "talent acquisition", "candidate sourcing", "hiring"),
     "onboarding": ("onboarding", "employee induction", "new hire orientation", "new starter"),
     "employee relations": ("employee relations", "staff relations", "workplace relations", "employee engagement"),
-    "human resources": ("human resources", "hr operations", "people operations", "people management"),
-    "documentation": ("documentation", "document management", "document control", "file management"),
-    "records management": ("records management", "record keeping", "records administration", "personnel records"),
-    "client communication": ("client communication", "client relations", "customer communication", "client liaison"),
+    "human resources": ("human resources", "hr operations", "people operations", "people management", "employee management"),
+    "documentation": ("documentation", "document management", "document control", "file management", "documents", "case files"),
+    "records management": ("records management", "record keeping", "records administration", "personnel records", "record management"),
+    "client communication": ("client communication", "client relations", "customer communication", "client liaison", "client"),
     "compliance": ("compliance", "regulatory compliance", "policy compliance", "risk and compliance"),
     "legal research": ("legal research", "case research", "legal analysis", "regulatory research"),
-    "contract management": ("contract management", "contract administration", "contracts management", "contract review"),
-    "policy": ("policy", "policy development", "policy implementation", "policy review"),
+    "contract management": ("contract management", "contract administration", "contracts management", "contract review", "contracts"),
+    "policy": ("policy", "policies", "policy development", "policy implementation", "policy review"),
     "google workspace": ("google workspace", "google suite", "g suite"),
     "microsoft office": ("microsoft office", "microsoft 365", "ms office", "office 365"),
-    "slack": ("slack",), "zoom": ("zoom", "video conferencing"),
-    "salesforce": ("salesforce", "salesforce crm"), "workday": ("workday", "workday hcm"),
+    "slack": ("slack",),
+    "zoom": ("zoom", "video conferencing"),
+    "salesforce": ("salesforce", "salesforce crm"),
+    "workday": ("workday", "workday hcm"),
     "confidential information": ("confidential information", "sensitive information", "confidential records", "data confidentiality"),
-    "reporting": ("reporting", "management reports", "report preparation", "prepare reports"),
-    "scheduling": ("scheduling", "schedule management", "appointment scheduling", "meeting coordination", "coordinate meetings", "leadership meetings"),
+    "reporting": ("reporting", "management reports", "report preparation", "prepare reports", "reports"),
+    "scheduling": ("scheduling", "schedule management", "appointment scheduling", "meeting coordination", "coordinate meetings", "leadership meetings", "schedules", "meetings"),
     "training": ("training", "learning and development", "staff development", "training coordination"),
 }
 SKILL_KEYWORDS = tuple(SEMANTIC_SKILL_GROUPS)
@@ -118,57 +120,93 @@ def _verified_keywords(job: Job) -> tuple[str, ...]:
 def prioritize_experience(category: str):
     terms, title_terms = EXPERIENCE_PRIORITY_TERMS.get(category, ()), EXPERIENCE_TITLE_TERMS.get(category, ())
     def relevance(item):
-        title, _, bullets = item; title_text = title.lower(); body = " ".join(bullets).lower()
+        title, _, bullets = item
+        title_text, body = title.lower(), " ".join(bullets).lower()
         return sum(3 for term in title_terms if term in title_text) + sum(body.count(term) for term in terms) + sum(title_text.count(term) for term in terms)
     return tuple(item for _, item in sorted(enumerate(VERIFIED_EXPERIENCE), key=lambda pair: (-relevance(pair[1]), pair[0])))
 
 
+def prioritize_bullets(bullets, keywords: tuple[str, ...]):
+    """Reorder existing verified bullets by vacancy relevance without rewriting or inventing evidence."""
+    def relevance(bullet: str) -> int:
+        text = _normalise_text(bullet)
+        score = 0
+        for keyword in keywords:
+            variants = SEMANTIC_SKILL_GROUPS.get(keyword, (keyword,))
+            if any(_normalise_text(variant) in text for variant in variants):
+                score += 1
+        return score
+    return tuple(bullet for _, bullet in sorted(enumerate(bullets), key=lambda pair: (-relevance(pair[1]), pair[0])))
+
+
 def _add_contact(document: Document, profile: ApplicantProfile) -> None:
-    heading = document.add_heading(profile.full_name.upper(), level=0); heading.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
-    contact = document.add_paragraph(); contact.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
+    heading = document.add_heading(profile.full_name.upper(), level=0)
+    heading.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
+    contact = document.add_paragraph()
+    contact.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
     contact.add_run(f"{profile.city}, {profile.country} | {profile.phone} | {profile.email}\nLinkedIn: {profile.linkedin_url}")
 
 
 def build_tailored_cv(job: Job, profile: ApplicantProfile, output: Path) -> None:
-    category, keywords, document = classify_job(job), _verified_keywords(job), Document(); _add_contact(document, profile)
-    document.add_heading(CATEGORY_HEADLINES[category], level=1); document.add_heading("Professional Profile", level=1)
+    category, keywords, document = classify_job(job), _verified_keywords(job), Document()
+    _add_contact(document, profile)
+    document.add_heading(CATEGORY_HEADLINES[category], level=1)
+    document.add_heading("Professional Profile", level=1)
     summary = CATEGORY_SUMMARIES[category]
-    if keywords: summary += " Relevant strengths include " + ", ".join(keywords[:6]) + "."
-    document.add_paragraph(summary); document.add_heading("Core Competencies", level=1); skills = list(BASE_SKILLS[category])
+    if keywords:
+        summary += " Relevant strengths include " + ", ".join(keywords[:6]) + "."
+    document.add_paragraph(summary)
+    document.add_heading("Core Competencies", level=1)
+    skills = list(BASE_SKILLS[category])
     for keyword in keywords:
         formatted = keyword.title()
-        if formatted.lower() not in {skill.lower() for skill in skills}: skills.insert(0, formatted)
-    for skill in skills[:12]: document.add_paragraph(skill, style="List Bullet")
+        if formatted.lower() not in {skill.lower() for skill in skills}:
+            skills.insert(0, formatted)
+    for skill in skills[:12]:
+        document.add_paragraph(skill, style="List Bullet")
     document.add_heading("Professional Experience", level=1)
     for title, dates, bullets in prioritize_experience(category):
-        document.add_heading(title, level=2); document.add_paragraph(dates)
-        for bullet in bullets: document.add_paragraph(bullet, style="List Bullet")
+        document.add_heading(title, level=2)
+        document.add_paragraph(dates)
+        for bullet in prioritize_bullets(bullets, keywords):
+            document.add_paragraph(bullet, style="List Bullet")
     document.add_heading("Leadership and Memberships", level=1)
-    for item in ("Director of International Engagements, Street Kid Africa Foundation", "Nigerian Bar Association", "African Bar Association", "Commonwealth Lawyers Association"): document.add_paragraph(item, style="List Bullet")
+    for item in ("Director of International Engagements, Street Kid Africa Foundation", "Nigerian Bar Association", "African Bar Association", "Commonwealth Lawyers Association"):
+        document.add_paragraph(item, style="List Bullet")
     document.add_heading("Education and Professional Development", level=1)
-    for item in ("High Impact Executive Assistant Training Program, Skill2Scale Digital, 2026", "Barrister at Law, Nigerian Law School, 2019 - 2020", "Bachelor of Laws, University of Uyo, 2013 - 2018", "Advanced Diploma in Aviation Management, College of Aviation Studies, 2008 - 2010", "Diploma in Community Development, University of Benin, 2005 - 2007"): document.add_paragraph(item, style="List Bullet")
+    for item in ("High Impact Executive Assistant Training Program, Skill2Scale Digital, 2026", "Barrister at Law, Nigerian Law School, 2019 - 2020", "Bachelor of Laws, University of Uyo, 2013 - 2018", "Advanced Diploma in Aviation Management, College of Aviation Studies, 2008 - 2010", "Diploma in Community Development, University of Benin, 2005 - 2007"):
+        document.add_paragraph(item, style="List Bullet")
     document.save(output)
 
 
 def build_tailored_cover_letter(job: Job, profile: ApplicantProfile, output: Path) -> None:
-    category, keywords, document = classify_job(job), _verified_keywords(job), Document(); _add_contact(document, profile)
-    document.add_paragraph(date.today().strftime("%d %B %Y")); document.add_paragraph("Dear Hiring Team,")
+    category, keywords, document = classify_job(job), _verified_keywords(job), Document()
+    _add_contact(document, profile)
+    document.add_paragraph(date.today().strftime("%d %B %Y"))
+    document.add_paragraph("Dear Hiring Team,")
     document.add_paragraph(f"I am writing to apply for the {job.title} position at {job.company}. {CATEGORY_SUMMARIES[category]}")
     relevant = ", ".join(keywords[:5]) if keywords else "stakeholder management, workflow coordination and confidential administration"
     document.add_paragraph(f"My experience aligns with the role's emphasis on {relevant}. In my current human resources leadership role, I coordinate recruitment, onboarding, employee relations, records and administrative reporting. My earlier legal and nonprofit work strengthened my client communication, documentation, scheduling and cross-functional coordination capabilities.")
     document.add_paragraph("I bring a practical combination of executive support, operations, people management and compliance awareness. I am comfortable working independently, handling sensitive information and maintaining dependable communication across remote and international teams.")
-    document.add_paragraph(f"I would welcome the opportunity to discuss how I can support {job.company} and contribute to the successful delivery of this role. Thank you for your time and consideration."); document.add_paragraph(f"Kind regards,\n\n{profile.full_name}"); document.save(output)
+    document.add_paragraph(f"I would welcome the opportunity to discuss how I can support {job.company} and contribute to the successful delivery of this role. Thank you for your time and consideration.")
+    document.add_paragraph(f"Kind regards,\n\n{profile.full_name}")
+    document.save(output)
 
 
 def tailor_documents(job: Job, job_id: int, profile: ApplicantProfile) -> TailoredDocuments:
-    category = classify_job(job); folder = TAILORED_APPLICATIONS_DIR / f"{job_id}_{safe_name(job.company)}_{safe_name(job.title)}"; folder.mkdir(parents=True, exist_ok=True)
-    resume, cover = folder / "tailored_cv.docx", folder / "tailored_cover_letter.docx"; build_tailored_cv(job, profile, resume); build_tailored_cover_letter(job, profile, cover)
+    category = classify_job(job)
+    folder = TAILORED_APPLICATIONS_DIR / f"{job_id}_{safe_name(job.company)}_{safe_name(job.title)}"
+    folder.mkdir(parents=True, exist_ok=True)
+    resume, cover = folder / "tailored_cv.docx", folder / "tailored_cover_letter.docx"
+    build_tailored_cv(job, profile, resume)
+    build_tailored_cover_letter(job, profile, cover)
     certificate = None
     if category in {"EXECUTIVE_OPERATIONS", "NGO_PROGRAMME"}:
         source = Path(profile.supporting_document_path)
         if source.is_file():
             certificate = folder / source.name
-            if source.resolve() != certificate.resolve(): certificate.write_bytes(source.read_bytes())
+            if source.resolve() != certificate.resolve():
+                certificate.write_bytes(source.read_bytes())
     return TailoredDocuments(category, folder, resume, cover, certificate, _verified_keywords(job))
 
 
