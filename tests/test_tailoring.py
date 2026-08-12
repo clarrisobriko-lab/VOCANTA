@@ -5,7 +5,7 @@ from pathlib import Path
 from docx import Document
 
 from automation.profile import ApplicantProfile
-from automation.tailoring import CATEGORY_HEADLINES, classify_job, extract_keywords, prioritize_experience, tailor_documents
+from automation.tailoring import CATEGORY_HEADLINES, classify_job, extract_keywords, prioritize_bullets, prioritize_experience, tailor_documents
 from core.models import Job
 
 
@@ -27,6 +27,16 @@ class TailoringTests(unittest.TestCase):
         for description, expected in cases:
             matches = extract_keywords(Job("Example", "Specialist", "Remote", "test", "https://example.com", description=description))
             for keyword in expected: self.assertIn(keyword, matches)
+
+    def test_bullets_are_prioritized_without_rewriting(self):
+        bullets = (
+            "Digitised filing systems and improved document accessibility.",
+            "Supported recruitment and employee record management.",
+            "Managed calendars, meetings and executive correspondence.",
+        )
+        ranked = prioritize_bullets(bullets, ("calendar management", "scheduling", "executive support"))
+        self.assertEqual(ranked[0], bullets[2])
+        self.assertCountEqual(ranked, bullets)
 
     def test_documents_are_created(self):
         with tempfile.TemporaryDirectory() as directory:
