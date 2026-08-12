@@ -20,13 +20,13 @@ class ATSMatchTests(unittest.TestCase):
     def test_unsupported_tool_is_reported_as_gap(self):
         job = Job(
             "Example", "Executive Assistant", "Remote", "test", "https://example.com",
-            description="Manage executive diaries, leadership meetings and Slack collaboration",
+            description="Manage executive diaries, leadership meetings and Zoom video conferencing",
         )
         result = analyse_ats_match(job)
         self.assertIn("executive support", result.matched_skills)
         self.assertIn("calendar management", result.matched_skills)
         self.assertIn("scheduling", result.matched_skills)
-        self.assertIn("slack", result.missing_skills)
+        self.assertIn("zoom", result.missing_skills)
         self.assertLess(result.score, 100)
 
     def test_no_detected_requirements_is_neutral_not_failure(self):
