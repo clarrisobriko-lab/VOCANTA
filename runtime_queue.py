@@ -24,7 +24,6 @@ def process_runtime_queue(database: Database, profile, *, pipeline=run_applicati
     for row in candidates:
         job = row_to_job(row)
         result = pipeline(job, row["id"], profile)
-        database.record_acquisition_decision(row["id"], result.decision)
         if not result.decision.should_apply:
             database.record_queue_audit(row["id"], "ATS_PIPELINE", "REJECTED", result.decision.reason)
             continue
