@@ -20,16 +20,12 @@ ASSETS_DIR = USER_DATA_DIR / "assets"
 
 PACKAGED_MASTER_CV_FILE = PACKAGE_ASSETS_DIR / "master_cv.docx"
 PACKAGED_MASTER_COVER_LETTER_FILE = PACKAGE_ASSETS_DIR / "master_cover_letter.docx"
-PACKAGED_EXECUTIVE_ASSISTANT_CERTIFICATE_FILE = (
-    PACKAGE_ASSETS_DIR / "executive_assistant_certificate.pdf"
-)
-
+PACKAGED_EXECUTIVE_ASSISTANT_CERTIFICATE_FILE = PACKAGE_ASSETS_DIR / "executive_assistant_certificate.pdf"
 MASTER_CV_FILE = ASSETS_DIR / "master_cv.docx"
 MASTER_COVER_LETTER_FILE = ASSETS_DIR / "master_cover_letter.docx"
 EXECUTIVE_ASSISTANT_CERTIFICATE_FILE = ASSETS_DIR / "executive_assistant_certificate.pdf"
 TAILORED_APPLICATIONS_DIR = APPLICATIONS_DIR / "tailored"
 TAILORING_MAX_KEYWORDS = 12
-
 APPLICANT_PROFILE_FILE = USER_DATA_DIR / "applicant_profile.json"
 BROWSER_PROFILE_DIR = DATA_DIR / "browser_profile"
 AUTOMATION_SCREENSHOT_DIR = EXPORT_DIR / "automation_screenshots"
@@ -38,13 +34,9 @@ AUTOMATION_MAX_APPLICATIONS_PER_RUN = 1
 AUTOMATION_HEADLESS = False
 AUTOMATION_AUTO_SUBMIT_STANDARD_FORMS = True
 AUTOMATION_DEFAULT_COUNTRY = "Nigeria"
-
-# Production eligibility gates. Only explicit worldwide eligibility, or a target-country
-# vacancy with explicit sponsorship/relocation/international hiring, may enter automation.
 HARD_ELIGIBILITY_GATE = True
 STREAM_AUTOMATION_ON_DISCOVERY = False
 STREAM_AUTOMATION_POLL_SECONDS = 3
-
 EMAIL_SETTINGS_FILE = USER_DATA_DIR / "email_settings.json"
 LEGACY_EMAIL_SETTINGS_FILE = DATA_DIR / "email_settings.json"
 EMAIL_OUTBOX_DIR = USER_DATA_DIR / "email_outbox"
@@ -63,7 +55,6 @@ CSV_FILE = EXPORT_DIR / "shortlisted.csv"
 HTML_FILE = EXPORT_DIR / "shortlisted.html"
 APPLICATIONS_CSV_FILE = EXPORT_DIR / "applications.csv"
 APPLICATIONS_HTML_FILE = EXPORT_DIR / "applications.html"
-
 REQUEST_TIMEOUT_SECONDS = 12
 MAX_CONNECTOR_WORKERS = 8
 MINIMUM_SCORE = 35
@@ -71,344 +62,50 @@ SHORTLIST_SCORE = 60
 MAX_DASHBOARD_ROWS = 60
 ARBEITNOW_MAX_PAGES = 5
 HIMALAYAS_MAX_PAGES = 0
-
-# Cloudflare-protected sources are excluded from automation.
-# VOCANTA will not fetch from, open, or pause on these domains.
-# v3.2.1 production launch policy: discovery is restricted to direct Greenhouse
-# boards because Greenhouse is the only ATS currently supported end to end.
-DISABLED_CONNECTORS = {
-    "arbeitnow", "ashby", "himalayas", "jobicy", "lever",
-    "remoteok", "remotive", "smartrecruiters",
-}
-BLOCKED_AUTOMATION_DOMAINS = {
-    "himalayas.app",
-    "remoteok.com",
-    "jobgether.com",
-    "jobicy.com",
-    "www.jobicy.com",
-}
-
-# Discovery-only marketplaces may supply leads but must never receive browser automation.
+DISABLED_CONNECTORS = {"arbeitnow", "ashby", "himalayas", "jobicy", "lever", "remoteok", "remotive", "smartrecruiters"}
+BLOCKED_AUTOMATION_DOMAINS = {"himalayas.app", "remoteok.com", "jobgether.com", "jobicy.com", "www.jobicy.com"}
 SUPPORTED_AUTOMATION_ATS = {"GREENHOUSE"}
-
-DISCOVERY_ONLY_AUTOMATION_DOMAINS = {
-    "remoteok.com",
-    "www.remoteok.com",
-    "jobgether.com",
-    "www.jobgether.com",
-    "jobicy.com",
-    "www.jobicy.com",
-}
+DISCOVERY_ONLY_AUTOMATION_DOMAINS = {"remoteok.com", "www.remoteok.com", "jobgether.com", "www.jobgether.com", "jobicy.com", "www.jobicy.com"}
 DISCOVERY_ONLY_SOURCES = {"remoteok", "jobgether", "jobicy"}
 DISCOVERY_ONLY_COMPANIES = {"jobgether", "jobicy"}
 REMOTEOK_LIMIT = 500
 DEFAULT_FOLLOW_UP_DAYS = 7
 APPLICATION_QUEUE_LIMIT = 30
-
-COUNTRY_PRIORITY = {
-    "united kingdom": 100,
-    "ireland": 98,
-    "portugal": 90,
-    "estonia": 85,
-    "lithuania": 84,
-    "latvia": 82,
-}
-
-COUNTRY_LANGUAGE_PENALTIES = {
-    "germany": -20,
-    "austria": -20,
-    "france": -25,
-    "spain": -15,
-}
-
-SECONDARY_COUNTRY_PRIORITY = {
-    "germany": 65,
-    "austria": 62,
-    "france": 60,
-    "spain": 68,
-}
-
-COUNTRY_ALIASES = {
-    "united kingdom": ("united kingdom", "uk", "london", "england", "scotland", "wales"),
-    "ireland": ("ireland", "dublin", "cork", "galway"),
-    "portugal": ("portugal", "lisbon", "porto"),
-    "estonia": ("estonia", "tallinn"),
-    "lithuania": ("lithuania", "vilnius", "kaunas"),
-    "latvia": ("latvia", "riga"),
-    "germany": ("germany", "berlin", "munich", "hamburg", "frankfurt"),
-    "austria": ("austria", "vienna"),
-    "france": ("france", "paris"),
-    "spain": ("spain", "madrid", "barcelona"),
-}
-
-GLOBAL_REMOTE_TERMS = {
-    "worldwide",
-    "anywhere",
-    "all countries",
-    "remote worldwide",
-    "worldwide remote",
-    "work from anywhere",
-    "work from anywhere in the world",
-    "anywhere in the world",
-    "global remote",
-    "open globally",
-    "remote - global",
-}
-
-
-EXPLICIT_ONSITE_TERMS = {
-    "office based",
-    "office-based",
-    "on site",
-    "on-site",
-    "onsite",
-    "based in our office",
-    "work from our office",
-}
-
-REGIONAL_REMOTE_TERMS = {
-    "remote",
-    "home based",
-    "emea",
-    "europe",
-}
-
-ENGLISH_WORKING_LANGUAGE_TERMS = {
-    "english is the working language",
-    "working language is english",
-    "english-speaking environment",
-    "business language is english",
-    "company language is english",
-    "no german required",
-    "german not required",
-    "no french required",
-    "french not required",
-    "no spanish required",
-    "spanish not required",
-}
-
-PRIORITY_LOCATIONS = {
-    **{alias: score for country, score in COUNTRY_PRIORITY.items()
-       for alias in COUNTRY_ALIASES[country]},
-    **{alias: score for country, score in SECONDARY_COUNTRY_PRIORITY.items()
-       for alias in COUNTRY_ALIASES[country]},
-    "remote worldwide": 100,
-    "worldwide remote": 100,
-    "work from anywhere": 100,
-    "global remote": 100,
-    "anywhere in the world": 100,
-    "remote": 75,
-    "home based": 75,
-    "emea": 72,
-    "europe": 70,
-}
-
-TARGET_ROLE_WEIGHTS = {
-    "administrative assistant": 50,
-    "admin assistant": 48,
-    "virtual administrative assistant": 50,
-    "executive assistant": 50,
-    "personal assistant": 42,
-    "human resources assistant": 50,
-    "human resources": 38,
-    "hr business partner": 42,
-    "hr assistant": 50,
-    "hr administrator": 48,
-    "human resources administrator": 48,
-    "recruitment coordinator": 46,
-    "recruiting coordinator": 46,
-    "talent acquisition coordinator": 46,
-    "operations coordinator": 50,
-    "administrative coordinator": 50,
-    "admin coordinator": 48,
-    "project coordinator": 44,
-    "programme coordinator": 44,
-    "program coordinator": 44,
-    "legal assistant": 50,
-    "legal administrative assistant": 50,
-    "legal secretary": 46,
-    "paralegal": 44,
-    "legal operations coordinator": 46,
-    "compliance assistant": 46,
-    "compliance coordinator": 46,
-    "junior compliance specialist": 44,
-    "people operations coordinator": 46,
-    "people coordinator": 44,
-    "office administrator": 44,
-    "operations assistant": 48,
-    "customer support specialist": 38,
-}
-
-PROFILE_KEYWORDS = {
-    "employment law": 8,
-    "legal research": 7,
-    "litigation": 6,
-    "contracts": 7,
-    "regulatory": 7,
-    "compliance": 8,
-    "policy": 6,
-    "human resources": 8,
-    "employee relations": 8,
-    "recruitment": 7,
-    "onboarding": 6,
-    "training": 5,
-    "administration": 5,
-    "stakeholder": 5,
-    "ngo": 5,
-    "human rights": 7,
-    "case management": 7,
-    "operations": 5,
-}
-
-EXCLUDED_TITLE_TERMS = {
-    "software engineer", "software developer", "backend engineer",
-    "frontend engineer", "full stack", "devops", "site reliability",
-    "cloud engineer", "data scientist", "machine learning",
-    "security engineer", "cybersecurity engineer", "network engineer",
-    "systems engineer", "kernel engineer", "hardware engineer",
-    "embedded engineer", "qa engineer", "test engineer", "field engineer",
-    "sales engineer", "solutions engineer", "support engineer",
-    "design engineer", "data governance engineer", "governance engineer", "engineer", "developer",
-    "sales development representative", "account executive",
-    "product manager", "marketing manager", "customer success manager",
-    "talent scientist", "talent analytics", "sales operations",
-    "travel operations", "netsuite administrator",
-    "salesforce administrator", "jira administrator",
-    "threat intelligence", "accountant", "finance analyst",
-}
-
-GENERIC_TITLES = {
-    "general interest", "general application", "future opportunities",
-    "join our talent community",
-}
-
-NON_ENGLISH_REQUIREMENT_TERMS = {
-    "german required", "german speaker", "fluent german", "deutsch",
-    "french required", "french speaker", "fluent french", "français",
-    "spanish required", "spanish speaker", "fluent spanish",
-    "italian required", "italian speaker", "dutch speaker",
-    "mandarin speaking", "japanese speaker", "arabic speaker",
-    "portuguese speaker", "native language",
-}
-
-NO_SPONSORSHIP_TERMS = {
-    "no visa sponsorship", "cannot sponsor", "unable to sponsor",
-    "must have the right to work", "existing right to work required",
-    "not eligible for sponsorship", "no sponsorship available",
-}
-
-SPONSORSHIP_POSITIVE_TERMS = {
-    "visa sponsorship", "sponsorship available", "work permit support",
-    "relocation support", "immigration support", "global mobility",
-}
-
-SENIORITY_PENALTIES = {
-    "manager": 10,
-    "senior": 30,
-    "lead": 30,
-    "principal": 35,
-    "director": 45,
-    "head of": 45,
-    "vice president": 50,
-    "vp ": 50,
-    "chief ": 50,
-}
-
+COUNTRY_PRIORITY = {"united kingdom": 100, "ireland": 98, "portugal": 90, "estonia": 85, "lithuania": 84, "latvia": 82}
+COUNTRY_LANGUAGE_PENALTIES = {"germany": -20, "austria": -20, "france": -25, "spain": -15}
+SECONDARY_COUNTRY_PRIORITY = {"germany": 65, "austria": 62, "france": 60, "spain": 68}
+COUNTRY_ALIASES = {"united kingdom": ("united kingdom", "uk", "london", "england", "scotland", "wales"), "ireland": ("ireland", "dublin", "cork", "galway"), "portugal": ("portugal", "lisbon", "porto"), "estonia": ("estonia", "tallinn"), "lithuania": ("lithuania", "vilnius", "kaunas"), "latvia": ("latvia", "riga"), "germany": ("germany", "berlin", "munich", "hamburg", "frankfurt"), "austria": ("austria", "vienna"), "france": ("france", "paris"), "spain": ("spain", "madrid", "barcelona")}
+GLOBAL_REMOTE_TERMS = {"worldwide", "anywhere", "all countries", "remote worldwide", "worldwide remote", "work from anywhere", "work from anywhere in the world", "anywhere in the world", "global remote", "open globally", "remote - global"}
+EXPLICIT_ONSITE_TERMS = {"office based", "office-based", "on site", "on-site", "onsite", "based in our office", "work from our office"}
+REGIONAL_REMOTE_TERMS = {"remote", "home based", "emea", "europe"}
+ENGLISH_WORKING_LANGUAGE_TERMS = {"english is the working language", "working language is english", "english-speaking environment", "business language is english", "company language is english", "no german required", "german not required", "no french required", "french not required", "no spanish required", "spanish not required"}
+PRIORITY_LOCATIONS = {**{alias: score for country, score in COUNTRY_PRIORITY.items() for alias in COUNTRY_ALIASES[country]}, **{alias: score for country, score in SECONDARY_COUNTRY_PRIORITY.items() for alias in COUNTRY_ALIASES[country]}, "remote worldwide": 100, "worldwide remote": 100, "work from anywhere": 100, "global remote": 100, "anywhere in the world": 100, "remote": 75, "home based": 75, "emea": 72, "europe": 70}
+TARGET_ROLE_WEIGHTS = {"administrative assistant": 50, "admin assistant": 48, "virtual administrative assistant": 50, "executive assistant": 50, "personal assistant": 42, "human resources assistant": 50, "human resources": 38, "hr business partner": 42, "hr assistant": 50, "hr administrator": 48, "human resources administrator": 48, "recruitment coordinator": 46, "recruiting coordinator": 46, "talent acquisition coordinator": 46, "operations coordinator": 50, "administrative coordinator": 50, "admin coordinator": 48, "project coordinator": 44, "programme coordinator": 44, "program coordinator": 44, "legal assistant": 50, "legal administrative assistant": 50, "legal secretary": 46, "paralegal": 44, "legal operations coordinator": 46, "compliance assistant": 46, "compliance coordinator": 46, "junior compliance specialist": 44, "people operations coordinator": 46, "people coordinator": 44, "office administrator": 44, "operations assistant": 48, "customer support specialist": 38}
+PROFILE_KEYWORDS = {"employment law": 8, "legal research": 7, "litigation": 6, "contracts": 7, "regulatory": 7, "compliance": 8, "policy": 6, "human resources": 8, "employee relations": 8, "recruitment": 7, "onboarding": 6, "training": 5, "administration": 5, "stakeholder": 5, "ngo": 5, "human rights": 7, "case management": 7, "operations": 5}
+EXCLUDED_TITLE_TERMS = {"software engineer", "software developer", "backend engineer", "frontend engineer", "full stack", "devops", "site reliability", "cloud engineer", "data scientist", "machine learning", "security engineer", "cybersecurity engineer", "network engineer", "systems engineer", "kernel engineer", "hardware engineer", "embedded engineer", "qa engineer", "test engineer", "field engineer", "sales engineer", "solutions engineer", "support engineer", "design engineer", "data governance engineer", "governance engineer", "engineer", "developer", "sales development representative", "account executive", "product manager", "marketing manager", "customer success manager", "talent scientist", "talent analytics", "sales operations", "travel operations", "netsuite administrator", "salesforce administrator", "jira administrator", "threat intelligence", "accountant", "finance analyst"}
+GENERIC_TITLES = {"general interest", "general application", "future opportunities", "join our talent community"}
+NON_ENGLISH_REQUIREMENT_TERMS = {"german required", "german speaker", "fluent german", "deutsch", "french required", "french speaker", "fluent french", "français", "spanish required", "spanish speaker", "fluent spanish", "italian required", "italian speaker", "dutch speaker", "mandarin speaking", "japanese speaker", "arabic speaker", "portuguese speaker", "native language"}
+NO_SPONSORSHIP_TERMS = {"no visa sponsorship", "cannot sponsor", "unable to sponsor", "must have the right to work", "existing right to work required", "not eligible for sponsorship", "no sponsorship available"}
+SPONSORSHIP_POSITIVE_TERMS = {"visa sponsorship", "sponsorship available", "work permit support", "relocation support", "immigration support", "global mobility"}
+SENIORITY_PENALTIES = {"manager": 10, "senior": 30, "lead": 30, "principal": 35, "director": 45, "head of": 45, "vice president": 50, "vp ": 50, "chief ": 50}
 GREENHOUSE_EMPLOYER_REGISTRY_FILE = BASE_DIR / "config" / "greenhouse_employers.json"
-
-# Legacy mapping retained only for migration compatibility. Live discovery reads
-# the employer-level registry and never treats Greenhouse as one giant source.
 GREENHOUSE_BOARDS: dict[str, str] = {}
-
-LEVER_SITES = {
-    "Assist World": "assist-world",
-}
-
+LEVER_SITES = {"Assist World": "assist-world"}
 ASHBY_BOARDS: dict[str, str] = {}
 SMARTRECRUITERS_COMPANIES: dict[str, str] = {}
-
-
-GEO_BLOCK_TERMS = {
-    "venezuela only",
-    "us only",
-    "united states only",
-    "uk only",
-    "eu only",
-    "latam only",
-    "citizens only",
-    "must reside",
-    "must already live",
-    "work authorization required",
-}
-
-RELOCATION_POSITIVE_TERMS = {
-    "relocation package": 15,
-    "relocation support": 15,
-    "visa sponsorship": 20,
-    "accommodation provided": 15,
-    "international applicants encouraged": 20,
-    "work permit support": 20,
-    "flight reimbursement": 10,
-}
-
-NGO_KEYWORDS = {
-    "unicef": 25,
-    "unhcr": 25,
-    "iom": 25,
-    "save the children": 20,
-    "oxfam": 20,
-    "amnesty": 20,
-    "red cross": 18,
-    "norwegian refugee council": 18,
-    "l'arche": 15,
-    "charity": 10,
-    "foundation": 8,
-}
-
-HIRING_URGENCY_TERMS = {
-    "immediate start": 10,
-    "urgent recruitment": 10,
-    "rolling applications": 8,
-    "applications reviewed continuously": 8,
-    "humanitarian response": 10,
-}
-
+WORKDAY_SITES: dict[str, str] = {}
+GEO_BLOCK_TERMS = {"venezuela only", "us only", "united states only", "uk only", "eu only", "latam only", "citizens only", "must reside", "must already live", "work authorization required"}
+RELOCATION_POSITIVE_TERMS = {"relocation package": 15, "relocation support": 15, "visa sponsorship": 20, "accommodation provided": 15, "international applicants encouraged": 20, "work permit support": 20, "flight reimbursement": 10}
+NGO_KEYWORDS = {"unicef": 25, "unhcr": 25, "iom": 25, "save the children": 20, "oxfam": 20, "amnesty": 20, "red cross": 18, "norwegian refugee council": 18, "l'arche": 15, "charity": 10, "foundation": 8}
+HIRING_URGENCY_TERMS = {"immediate start": 10, "urgent recruitment": 10, "rolling applications": 8, "applications reviewed continuously": 8, "humanitarian response": 10}
 ACTION_CENTRE_MAX_ITEMS = 100
-
-# v2.7 live-application guardrails
 STRICT_ELIGIBILITY_MODE = True
 MAX_AUTOMATION_REQUIRED_YEARS = 3
 BLOCK_SENIOR_TITLES = True
 ENTRY_LEVEL_BONUS = 14
 MID_LEVEL_BONUS = 5
 MANAGER_LEVEL_PENALTY = 12
-
-ENTRY_LEVEL_TITLE_TERMS = {
-    "assistant", "administrator", "administrative officer", "coordinator",
-    "junior", "associate", "officer", "specialist", "generalist",
-    "paralegal", "caseworker", "recruiter", "executive assistant",
-}
-
-HARD_SENIOR_TITLE_TERMS = {
-    "manager", "senior", "lead ", "team lead", "principal", "director",
-    "head of", "vice president", "vp ", "chief ", "c-suite",
-}
-
-INTERNATIONAL_OPENNESS_TERMS = {
-    "open to candidates worldwide", "open worldwide", "worldwide applicants",
-    "applicants worldwide", "global applicants", "international applicants",
-    "international candidates", "candidates globally", "global talent",
-    "work from anywhere", "remote worldwide", "worldwide remote",
-    "anywhere in the world", "open globally", "remote - global",
-    "africa", "african applicants", "open to africa",
-}
-
-REGION_RESTRICTION_TERMS = {
-    "united states only", "us only", "usa only", "u.s. only",
-    "remote - us", "remote us", "remote, us", "remote in the us",
-    "us-based only", "u.s.-based only", "must be based in the us",
-    "must reside in the us", "authorized to work in the us",
-    "canada only", "remote canada", "must reside in canada",
-    "australia only", "new zealand only", "latam only", "emea only",
-    "europe only", "eu only", "uk only", "united kingdom only",
-}
+ENTRY_LEVEL_TITLE_TERMS = {"assistant", "administrator", "administrative officer", "coordinator", "junior", "associate", "officer", "specialist", "generalist", "paralegal", "caseworker", "recruiter", "executive assistant"}
+HARD_SENIOR_TITLE_TERMS = {"manager", "senior", "lead ", "team lead", "principal", "director", "head of", "vice president", "vp ", "chief ", "c-suite"}
+INTERNATIONAL_OPENNESS_TERMS = {"open to candidates worldwide", "open worldwide", "worldwide applicants", "applicants worldwide", "global applicants", "international applicants", "international candidates", "candidates globally", "global talent", "work from anywhere", "remote worldwide", "worldwide remote", "anywhere in the world", "open globally", "remote - global", "africa", "african applicants", "open to africa"}
+REGION_RESTRICTION_TERMS = {"united states only", "us only", "usa only", "u.s. only", "remote - us", "remote us", "remote, us", "remote in the us", "us-based only", "u.s.-based only", "must be based in the us", "must reside in the us", "authorized to work in the us", "canada only", "remote canada", "must reside in canada", "australia only", "new zealand only", "latam only", "emea only", "europe only", "eu only", "uk only", "united kingdom only"}
