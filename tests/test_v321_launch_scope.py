@@ -6,8 +6,8 @@ from core.database import Database
 from core.models import Job
 
 
-def test_live_registry_contains_only_greenhouse():
-    assert [connector.name for connector in get_connectors()] == ["Greenhouse"]
+def test_live_registry_contains_promoted_production_connectors():
+    assert [connector.name for connector in get_connectors()] == ["Greenhouse", "Lever"]
 
 
 def test_terminal_job_url_is_suppressed_before_rediscovery():
