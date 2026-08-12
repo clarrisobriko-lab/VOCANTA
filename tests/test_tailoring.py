@@ -9,6 +9,7 @@ from automation.tailoring import (
     CATEGORY_HEADLINES,
     classify_job,
     extract_keywords,
+    prioritize_experience,
     tailor_documents,
 )
 from core.models import Job
@@ -81,6 +82,18 @@ class TailoringTests(unittest.TestCase):
                         self.assertIn(CATEGORY_HEADLINES[expected_category], text)
             finally:
                 module.TAILORED_APPLICATIONS_DIR = old
+
+    def test_experience_is_prioritized_by_category(self):
+        expectations = {
+            "HR_PEOPLE": "Human Resource Manager",
+            "LEGAL_COMPLIANCE": "Legal",
+            "NGO_PROGRAMME": "Legal Officer",
+            "EXECUTIVE_OPERATIONS": "HR Personnel",
+        }
+        for category, expected_title_fragment in expectations.items():
+            with self.subTest(category=category):
+                ranked = prioritize_experience(category)
+                self.assertIn(expected_title_fragment, ranked[0][0])
 
 
 if __name__ == "__main__":
