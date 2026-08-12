@@ -1,11 +1,8 @@
 from connectors.base import BaseConnector
 from connectors.greenhouse import GreenhouseConnector
+from connectors.lever import LeverConnector
 
 
 def get_connectors() -> list[BaseConnector]:
-    """Return the production connector set.
-
-    VOCANTA 3.3 is Greenhouse-only at ATS level, while Greenhouse discovery is
-    employer-curated through the fail-closed employer registry.
-    """
-    return [GreenhouseConnector()]
+    """Return ATS connectors supported by the production application pipeline."""
+    return [GreenhouseConnector(), LeverConnector()]
