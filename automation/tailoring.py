@@ -68,6 +68,13 @@ EXPERIENCE_PRIORITY_TERMS = {
     "NGO_PROGRAMME": ("ngo", "human rights", "government", "legal defence", "access to justice", "programme", "stakeholder", "client"),
 }
 
+EXPERIENCE_TITLE_TERMS = {
+    "EXECUTIVE_OPERATIONS": ("executive", "administrative", "hr personnel"),
+    "HR_PEOPLE": ("human resource", "hr personnel"),
+    "LEGAL_COMPLIANCE": ("legal", "counsel"),
+    "NGO_PROGRAMME": ("legal defence", "programme", "ngo"),
+}
+
 
 def safe_name(value: str) -> str:
     cleaned = re.sub(r"[^A-Za-z0-9._-]+", "_", value.strip())
@@ -86,13 +93,18 @@ def extract_keywords(job: Job) -> tuple[str, ...]:
 
 
 def prioritize_experience(category: str):
-    """Return verified experience ranked by relevance while preserving chronology on ties."""
+    """Rank verified experience by role relevance, with titles carrying extra weight."""
     terms = EXPERIENCE_PRIORITY_TERMS.get(category, ())
+    title_terms = EXPERIENCE_TITLE_TERMS.get(category, ())
 
     def relevance(item) -> int:
         title, _, bullets = item
-        text = " ".join((title, *bullets)).lower()
-        return sum(text.count(term) for term in terms)
+        title_text = title.lower()
+        body_text = " ".join(bullets).lower()
+        title_score = sum(3 for term in title_terms if term in title_text)
+        body_score = sum(body_text.count(term) for term in terms)
+        general_title_score = sum(title_text.count(term) for term in terms)
+        return title_score + general_title_score + body_score
 
     ranked = sorted(enumerate(VERIFIED_EXPERIENCE), key=lambda pair: (-relevance(pair[1]), pair[0]))
     return tuple(item for _, item in ranked)
