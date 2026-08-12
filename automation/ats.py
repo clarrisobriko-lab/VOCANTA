@@ -40,9 +40,12 @@ ADAPTERS = (
     ATSAdapter(
         name="ASHBY",
         host_markers=("ashbyhq.com",),
-        final_submit_texts=("submit application",),
-        confirmation_phrases=STANDARD_CONFIRMATIONS,
-        auto_submit_allowed=False,
+        final_submit_texts=("submit application", "submit"),
+        confirmation_phrases=STANDARD_CONFIRMATIONS + (
+            "application received",
+            "we'll be in touch",
+        ),
+        auto_submit_allowed=True,
     ),
     ATSAdapter(
         name="SMARTRECRUITERS",
