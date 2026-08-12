@@ -39,6 +39,35 @@ SKILL_KEYWORDS = (
     "executive support", "calendar management", "email management", "stakeholder management", "project coordination", "workflow management", "administrative support", "operations", "recruitment", "onboarding", "employee relations", "human resources", "people operations", "documentation", "records management", "client communication", "compliance", "legal research", "contract management", "policy", "google workspace", "microsoft office", "slack", "zoom", "confidential information", "reporting", "scheduling", "training",
 )
 
+SEMANTIC_SKILL_GROUPS = {
+    "executive support": ("executive support", "support executives", "support senior leadership", "c-suite support", "leadership support"),
+    "calendar management": ("calendar management", "calendar coordination", "manage calendars", "diary management", "diary coordination"),
+    "email management": ("email management", "inbox management", "manage inbox", "correspondence management"),
+    "stakeholder management": ("stakeholder management", "stakeholder engagement", "stakeholder relations", "relationship management"),
+    "project coordination": ("project coordination", "project management", "coordinate projects", "programme coordination", "program coordination"),
+    "workflow management": ("workflow management", "process coordination", "workflow coordination", "process improvement"),
+    "administrative support": ("administrative support", "administration support", "office administration", "business support"),
+    "recruitment": ("recruitment", "recruiting", "talent acquisition", "candidate sourcing", "hiring"),
+    "onboarding": ("onboarding", "employee induction", "new hire orientation", "new starter"),
+    "employee relations": ("employee relations", "staff relations", "workplace relations", "employee engagement"),
+    "human resources": ("human resources", "hr operations", "people operations", "people management"),
+    "documentation": ("documentation", "document management", "document control", "file management"),
+    "records management": ("records management", "record keeping", "records administration", "personnel records"),
+    "client communication": ("client communication", "client relations", "customer communication", "client liaison"),
+    "compliance": ("compliance", "regulatory compliance", "policy compliance", "risk and compliance"),
+    "legal research": ("legal research", "case research", "legal analysis", "regulatory research"),
+    "contract management": ("contract management", "contract administration", "contracts management", "contract review"),
+    "policy": ("policy", "policy development", "policy implementation", "policy review"),
+    "google workspace": ("google workspace", "google suite", "g suite"),
+    "microsoft office": ("microsoft office", "microsoft 365", "ms office", "office 365"),
+    "slack": ("slack",),
+    "zoom": ("zoom", "video conferencing"),
+    "confidential information": ("confidential information", "sensitive information", "confidential records", "data confidentiality"),
+    "reporting": ("reporting", "management reports", "report preparation", "prepare reports"),
+    "scheduling": ("scheduling", "schedule management", "appointment scheduling", "meeting coordination"),
+    "training": ("training", "learning and development", "staff development", "training coordination"),
+}
+
 CATEGORY_SUMMARIES = {
     "EXECUTIVE_OPERATIONS": "Executive Operations and Administrative Specialist with experience supporting leadership, coordinating workflows and managing people, documents and stakeholder communication across corporate, legal and nonprofit environments.",
     "HR_PEOPLE": "Human Resources and People Operations professional with experience in recruitment, onboarding, employee relations, policy implementation, records management and administrative reporting.",
@@ -87,9 +116,18 @@ def classify_job(job: Job) -> str:
     return max(scores, key=lambda category: (scores[category], category == "EXECUTIVE_OPERATIONS"))
 
 
+def _normalise_text(value: str) -> str:
+    return " ".join(re.sub(r"[^a-z0-9+#]+", " ", value.lower()).split())
+
+
 def extract_keywords(job: Job) -> tuple[str, ...]:
-    text = f"{job.title} {job.description}".lower()
-    return tuple(keyword for keyword in SKILL_KEYWORDS if keyword in text)[:TAILORING_MAX_KEYWORDS]
+    """Extract canonical ATS skills from exact terms and common job-description synonyms."""
+    text = _normalise_text(f"{job.title} {job.description}")
+    matches = []
+    for canonical, variants in SEMANTIC_SKILL_GROUPS.items():
+        if any(_normalise_text(variant) in text for variant in variants):
+            matches.append(canonical)
+    return tuple(matches[:TAILORING_MAX_KEYWORDS])
 
 
 def prioritize_experience(category: str):
