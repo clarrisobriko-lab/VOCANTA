@@ -3,5 +3,6 @@ rich>=13.9,<15
 playwright>=1.53,<2
 keyring>=25,<26
 python-docx>=1.1,<2
+reportlab>=4.2,<5
 google-auth>=2.35,<3
 google-auth-oauthlib>=1.2,<2
