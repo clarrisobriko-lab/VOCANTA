@@ -7,7 +7,7 @@ from core.models import Job
 
 
 def test_live_registry_contains_promoted_production_connectors():
-    assert [connector.name for connector in get_connectors()] == ["Greenhouse", "Lever", "Ashby"]
+    assert [connector.name for connector in get_connectors()] == ["Greenhouse", "Lever", "Ashby", "SmartRecruiters"]
 
 
 def test_terminal_job_url_is_suppressed_before_rediscovery():
@@ -25,9 +25,7 @@ def test_terminal_job_url_is_suppressed_before_rediscovery():
             )
             database.upsert_job(job)
             row = database.connection.execute("SELECT id FROM jobs").fetchone()
-            database.record_automation_attempt(
-                row["id"], "MANUAL_REQUIRED", "Own words response required", ""
-            )
+            database.record_automation_attempt(row["id"], "MANUAL_REQUIRED", "Own words response required", "")
             reason = database.terminal_automation_reason_for_url(job.url)
             assert reason is not None
             assert "MANUAL_REQUIRED" in reason
