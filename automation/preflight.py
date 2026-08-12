@@ -5,7 +5,6 @@ from automation.ats import adapter_for_url
 from config.settings import (
     BLOCKED_AUTOMATION_DOMAINS,
     DISCOVERY_ONLY_AUTOMATION_DOMAINS,
-    SUPPORTED_AUTOMATION_ATS,
 )
 
 
@@ -39,7 +38,17 @@ def assess_application_url(url: str) -> PreflightDecision:
         return PreflightDecision(False, f'Discovery-only marketplace: {discovery_only}', 'DISCOVERY_ONLY', host)
 
     adapter = adapter_for_url(url)
-    if adapter.name not in SUPPORTED_AUTOMATION_ATS:
-        return PreflightDecision(False, f'Unsupported application platform: {adapter.name}', adapter.name, host)
+    if not adapter.auto_submit_allowed:
+        return PreflightDecision(
+            False,
+            f'Unsupported application platform for automatic submission: {adapter.name}',
+            adapter.name,
+            host,
+        )
 
-    return PreflightDecision(True, f'{adapter.name} application is ready for automation', adapter.name, host)
+    return PreflightDecision(
+        True,
+        f'{adapter.name} application is ready for automation',
+        adapter.name,
+        host,
+    )
