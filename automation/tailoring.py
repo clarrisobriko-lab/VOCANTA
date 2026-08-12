@@ -41,6 +41,13 @@ CATEGORY_TERMS = {
     ),
 }
 
+CATEGORY_HEADLINES = {
+    "EXECUTIVE_OPERATIONS": "EXECUTIVE OPERATIONS AND ADMINISTRATIVE SPECIALIST",
+    "HR_PEOPLE": "HUMAN RESOURCES AND PEOPLE OPERATIONS PROFESSIONAL",
+    "LEGAL_COMPLIANCE": "LEGAL, COMPLIANCE AND OPERATIONS PROFESSIONAL",
+    "NGO_PROGRAMME": "PROGRAMME, OPERATIONS AND NONPROFIT SUPPORT PROFESSIONAL",
+}
+
 SKILL_KEYWORDS = (
     "executive support", "calendar management", "email management",
     "stakeholder management", "project coordination", "workflow management",
@@ -149,7 +156,6 @@ def classify_job(job: Job) -> str:
         category: sum(1 for term in terms if term in text)
         for category, terms in CATEGORY_TERMS.items()
     }
-    # Main career track wins ties.
     return max(scores, key=lambda category: (scores[category], category == "EXECUTIVE_OPERATIONS"))
 
 
@@ -175,7 +181,7 @@ def build_tailored_cv(job: Job, profile: ApplicantProfile, output: Path) -> None
     keywords = extract_keywords(job)
     document = Document()
     _add_contact(document, profile)
-    document.add_heading("EXECUTIVE OPERATIONS AND ADMINISTRATIVE SPECIALIST", level=1)
+    document.add_heading(CATEGORY_HEADLINES[category], level=1)
     document.add_heading("Professional Profile", level=1)
     summary = CATEGORY_SUMMARIES[category]
     if keywords:
