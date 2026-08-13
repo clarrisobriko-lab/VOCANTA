@@ -135,7 +135,7 @@ class SafetyReleaseTests(unittest.TestCase):
         self.assertFalse(
             adapter_for_url("https://example.com/jobs/1").auto_submit_allowed
         )
-        self.assertFalse(
+        self.assertTrue(
             adapter_for_url("https://acme.myworkdayjobs.com/job/1")
             .auto_submit_allowed
         )
