@@ -28,8 +28,8 @@ class PublicHiddenSourceConnector(BaseConnector):
         return self.source_name
 
     def fetch_jobs(self) -> Sequence[Job]:
-        session = create_session()
         try:
+            session = create_session()
             response = session.get(self.source_url, timeout=12)
             response.raise_for_status()
         except Exception as exc:
