@@ -1,5 +1,6 @@
 import hashlib
 import json
+import re
 from dataclasses import asdict, is_dataclass
 from pathlib import Path
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
@@ -10,19 +11,31 @@ TRACKING_PARAMETERS = {
     "gclid",
     "mc_cid",
     "mc_eid",
+    "ref",
     "referrer",
+    "source",
+    "sourceid",
+    "gh_jid",
 }
+
+TRACKING_PREFIXES = (
+    "utm_",
+    "gh_src",
+    "lever-",
+)
 
 
 def canonicalize_job_url(url: str) -> str:
     parts = urlsplit(url.strip())
     scheme = parts.scheme.lower() or "https"
     host = parts.netloc.lower()
-    path = parts.path.rstrip("/") or "/"
+    if host.startswith("www."):
+        host = host[4:]
+    path = re.sub(r"/{2,}", "/", parts.path).rstrip("/") or "/"
     query = [
         (key, value)
         for key, value in parse_qsl(parts.query, keep_blank_values=True)
-        if not key.lower().startswith("utm_")
+        if not any(key.lower().startswith(prefix) for prefix in TRACKING_PREFIXES)
         and key.lower() not in TRACKING_PARAMETERS
     ]
     return urlunsplit((scheme, host, path, urlencode(sorted(query)), ""))
