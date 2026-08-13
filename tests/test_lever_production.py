@@ -22,10 +22,11 @@ class LeverProductionTests(unittest.TestCase):
         self.assertIn("Greenhouse", names)
         self.assertIn("Ashby", names)
         self.assertIn("SmartRecruiters", names)
+        self.assertIn("Workday", names)
 
-    def test_workday_stays_blocked(self):
+    def test_workday_is_promoted(self):
         decision = assess_application_url("https://example.wd5.myworkdayjobs.com/job/abc123")
-        self.assertFalse(decision.allowed)
+        self.assertTrue(decision.allowed)
         self.assertEqual(decision.ats, "WORKDAY")
 
     def test_generic_form_stays_blocked(self):
