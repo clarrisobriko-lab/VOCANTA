@@ -20,11 +20,11 @@ class AshbyProductionTests(unittest.TestCase):
 
     def test_ashby_connector_is_in_production_registry(self):
         names = [connector.name for connector in get_connectors()]
-        self.assertEqual(names, ["Greenhouse", "Lever", "Ashby", "SmartRecruiters"])
+        self.assertEqual(names, ["Greenhouse", "Lever", "Ashby", "SmartRecruiters", "Workday"])
 
-    def test_workday_stays_blocked(self):
+    def test_workday_is_promoted(self):
         decision = assess_application_url("https://example.wd5.myworkdayjobs.com/job/abc123")
-        self.assertFalse(decision.allowed)
+        self.assertTrue(decision.allowed)
         self.assertEqual(decision.ats, "WORKDAY")
 
     def test_generic_form_stays_blocked(self):
