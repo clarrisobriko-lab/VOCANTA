@@ -33,7 +33,13 @@ ADAPTERS = (
         STANDARD_CONFIRMATIONS + ("application successfully submitted", "your application has been submitted"),
         True,
     ),
-    ATSAdapter("WORKDAY", ("workday.com", "myworkdayjobs.com"), ("submit",), STANDARD_CONFIRMATIONS, False),
+    ATSAdapter(
+        "WORKDAY",
+        ("workday.com", "myworkdayjobs.com"),
+        ("submit", "submit application"),
+        STANDARD_CONFIRMATIONS + ("your application was submitted", "your application has been submitted"),
+        True,
+    ),
 )
 
 
