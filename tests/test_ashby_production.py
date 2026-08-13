@@ -5,6 +5,9 @@ from automation.preflight import assess_application_url
 from connectors.registry import get_connectors
 
 
+EXPECTED_CONNECTORS = ["Greenhouse", "Lever", "Ashby", "SmartRecruiters", "Workday", "HiddenRoles", "UnlistedRemote", "InclusivelyRemote", "RemoteRocketship", "Remotive", "WorkingNomads", "Jobspresso"]
+
+
 class AshbyProductionTests(unittest.TestCase):
     def test_ashby_adapter_is_auto_submit_capable(self):
         adapter = adapter_for_url("https://jobs.ashbyhq.com/example/abc123")
@@ -19,8 +22,7 @@ class AshbyProductionTests(unittest.TestCase):
         self.assertEqual(decision.ats, "ASHBY")
 
     def test_ashby_connector_is_in_production_registry(self):
-        names = [connector.name for connector in get_connectors()]
-        self.assertEqual(names, ["Greenhouse", "Lever", "Ashby", "SmartRecruiters", "Workday", "HiddenRoles", "UnlistedRemote"])
+        self.assertEqual([connector.name for connector in get_connectors()], EXPECTED_CONNECTORS)
 
     def test_workday_is_promoted(self):
         decision = assess_application_url("https://example.wd5.myworkdayjobs.com/job/abc123")
