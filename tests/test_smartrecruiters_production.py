@@ -21,7 +21,7 @@ class SmartRecruitersProductionTests(unittest.TestCase):
     def test_connector_is_in_production_registry(self):
         self.assertEqual(
             [connector.name for connector in get_connectors()],
-            ["Greenhouse", "Lever", "Ashby", "SmartRecruiters", "Workday"],
+            ["Greenhouse", "Lever", "Ashby", "SmartRecruiters", "Workday", "HiddenRoles", "UnlistedRemote"],
         )
 
     def test_workday_is_promoted(self):
