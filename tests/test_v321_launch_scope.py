@@ -7,7 +7,7 @@ from core.models import Job
 
 
 def test_live_registry_contains_promoted_production_connectors():
-    assert [connector.name for connector in get_connectors()] == ["Greenhouse", "Lever", "Ashby", "SmartRecruiters", "Workday"]
+    assert [connector.name for connector in get_connectors()] == ["Greenhouse", "Lever", "Ashby", "SmartRecruiters", "Workday", "HiddenRoles", "UnlistedRemote"]
 
 
 def test_terminal_job_url_is_suppressed_before_rediscovery():
