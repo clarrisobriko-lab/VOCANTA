@@ -10,4 +10,9 @@ def test_registry_includes_hidden_discovery_sources_after_production_ats():
         "Workday",
         "HiddenRoles",
         "UnlistedRemote",
+        "InclusivelyRemote",
+        "RemoteRocketship",
+        "Remotive",
+        "WorkingNomads",
+        "Jobspresso",
     ]
