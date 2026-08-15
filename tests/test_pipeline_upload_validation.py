@@ -11,7 +11,26 @@ def _profile(tmp_path):
     cover = tmp_path / "cover.pdf"
     cv.write_bytes(b"%PDF-cv")
     cover.write_bytes(b"%PDF-cover")
-    return ApplicantProfile(resume_path=str(cv), cover_letter_path=str(cover))
+    return ApplicantProfile(
+        first_name="Test",
+        middle_name="",
+        last_name="Candidate",
+        email="test@example.com",
+        phone="+2348000000000",
+        city="Abuja",
+        country="Nigeria",
+        address="Test Address",
+        postal_code="900001",
+        linkedin_url="",
+        website_url="",
+        work_authorization="No, I require employer sponsorship",
+        requires_sponsorship=True,
+        notice_period="Immediately available",
+        salary_expectation="",
+        resume_path=str(cv),
+        cover_letter_path=str(cover),
+        supporting_document_path="",
+    )
 
 
 def test_valid_browser_documents_pass(tmp_path):
