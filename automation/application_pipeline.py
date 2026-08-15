@@ -1,7 +1,8 @@
 from dataclasses import dataclass, replace
 
 from agents.scorer import ApplicationDecision, Scorer
-from automation.browser import AutomationResult, BrowserApplicationEngine
+from automation.browser import AutomationResult
+from automation.hardened_browser import HardenedBrowserApplicationEngine
 from automation.package_builder import ApplicationPackage, build_application_package
 from automation.profile import ApplicantProfile
 from automation.tailoring import TailoredDocuments, tailor_documents
@@ -33,7 +34,7 @@ def run_application_pipeline(
     profile: ApplicantProfile,
     *,
     scorer: Scorer | None = None,
-    browser_engine_factory=BrowserApplicationEngine,
+    browser_engine_factory=HardenedBrowserApplicationEngine,
 ) -> PipelineResult:
     """Score, tailor, package and submit one eligible vacancy."""
     decision = (scorer or Scorer()).evaluate(job)
