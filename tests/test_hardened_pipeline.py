@@ -1,0 +1,6 @@
+from automation.application_pipeline import run_application_pipeline
+from automation.hardened_browser import HardenedBrowserApplicationEngine
+
+
+def test_hardened_browser_engine_is_pipeline_default():
+    assert run_application_pipeline.__kwdefaults__["browser_engine_factory"] is HardenedBrowserApplicationEngine
