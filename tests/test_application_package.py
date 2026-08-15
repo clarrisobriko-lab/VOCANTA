@@ -31,10 +31,12 @@ def test_ats_score_is_bounded():
     assert ats_match_score("alpha", ("alpha", "beta")) == 50
 
 
-def test_package_writer_creates_application_assets(tmp_path):
+def test_package_writer_creates_application_assets_and_pdfs(tmp_path):
     package = build_application_package("Candidate", "Acme", "Executive Assistant", "calendar coordination communication", "Calendar coordination professional")
     files = write_package(package, tmp_path)
     assert files["cv"].exists()
     assert files["cover_letter"].exists()
     assert files["keywords"].exists()
+    assert files["cv_pdf"].exists() and files["cv_pdf"].read_bytes().startswith(b"%PDF")
+    assert files["cover_letter_pdf"].exists() and files["cover_letter_pdf"].read_bytes().startswith(b"%PDF")
     assert "Executive Assistant" in files["cv"].read_text(encoding="utf-8")
