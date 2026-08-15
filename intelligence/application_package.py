@@ -3,6 +3,11 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 from pathlib import Path
+from xml.sax.saxutils import escape
+
+from reportlab.lib.pagesizes import A4
+from reportlab.lib.styles import getSampleStyleSheet
+from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer
 
 
 STOPWORDS = {"and", "the", "with", "for", "that", "this", "from", "you", "your", "our", "are", "will", "have", "has", "job", "role", "work", "team", "years", "experience"}
@@ -63,13 +68,33 @@ def build_application_package(candidate_name: str, company: str, job_title: str,
     return ApplicationPackage(tailored, letter, keywords, score)
 
 
+def _text_to_pdf(text: str, destination: Path, title: str) -> Path:
+    styles = getSampleStyleSheet()
+    story = []
+    for block in text.split("\n"):
+        if not block.strip():
+            story.append(Spacer(1, 8))
+            continue
+        story.append(Paragraph(escape(block), styles["BodyText"]))
+        story.append(Spacer(1, 4))
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    SimpleDocTemplate(str(destination), pagesize=A4, title=title).build(story)
+    if not destination.is_file() or destination.stat().st_size < 100:
+        raise RuntimeError(f"PDF generation failed: {destination}")
+    return destination
+
+
 def write_package(package: ApplicationPackage, output_dir: Path | str) -> dict[str, Path]:
     directory = Path(output_dir)
     directory.mkdir(parents=True, exist_ok=True)
     cv_path = directory / "tailored_cv.txt"
     letter_path = directory / "cover_letter.txt"
     keywords_path = directory / "ats_keywords.txt"
+    cv_pdf = directory / "tailored_cv.pdf"
+    letter_pdf = directory / "cover_letter.pdf"
     cv_path.write_text(package.tailored_cv, encoding="utf-8")
     letter_path.write_text(package.cover_letter, encoding="utf-8")
     keywords_path.write_text("\n".join(package.ats_keywords), encoding="utf-8")
-    return {"cv": cv_path, "cover_letter": letter_path, "keywords": keywords_path}
+    _text_to_pdf(package.tailored_cv, cv_pdf, "Tailored CV")
+    _text_to_pdf(package.cover_letter, letter_pdf, "Cover Letter")
+    return {"cv": cv_path, "cover_letter": letter_path, "keywords": keywords_path, "cv_pdf": cv_pdf, "cover_letter_pdf": letter_pdf}
