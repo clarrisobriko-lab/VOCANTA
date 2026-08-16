@@ -22,7 +22,7 @@ class SMTPFollowUpSender:
             if self.username:
                 client.login(self.username,self.password)
             client.send_message(mail)
-        return mail['Message ID'] if mail['Message ID'] else f"smtp:{recipient}:{message.subject}"
+        return mail['Message-ID'] or f"smtp:{recipient}:{message.subject}"
 
 
 class SMTPAlertSender:
@@ -39,4 +39,4 @@ class SMTPAlertSender:
             if self.username:
                 client.login(self.username,self.password)
             client.send_message(mail)
-        return mail['Message ID'] if mail['Message ID'] else f"smtp:{self.recipient}:{subject}"
+        return mail['Message-ID'] or f"smtp:{self.recipient}:{subject}"
