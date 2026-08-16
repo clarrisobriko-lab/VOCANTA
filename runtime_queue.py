@@ -4,62 +4,48 @@ from automation.profile import load_profile
 from config.settings import AUTOMATION_MAX_APPLICATIONS_PER_RUN, AUTOMATION_MINIMUM_SCORE
 from core.database import Database
 from core.models import Job
+from core.outcome_store import record_outcome
+from intelligence.application_outcomes import classify_outcome
 
 
 def row_to_job(row) -> Job:
-    return Job(
-        company=row["company"], title=row["title"], location=row["location"],
-        source=row["source"], url=row["url"], description=row["description"] or "",
-        salary=row["salary"] or "", employment_type=row["employment_type"] or "",
-        score=int(row["score"]),
-    )
+    return Job(company=row["company"], title=row["title"], location=row["location"], source=row["source"], url=row["url"], description=row["description"] or "", salary=row["salary"] or "", employment_type=row["employment_type"] or "", score=int(row["score"]))
 
 
 def process_runtime_queue(database: Database, profile, *, pipeline=run_application_pipeline) -> int:
-    """Process queued vacancies and durably reconcile every pipeline outcome."""
-    candidates = database.list_automation_candidates(
-        minimum_score=AUTOMATION_MINIMUM_SCORE,
-        limit=AUTOMATION_MAX_APPLICATIONS_PER_RUN,
-    )
-    audit = AcquisitionAuditStore(database)
-    submitted = 0
+    """Process queued vacancies, classify each browser result, and persist the outcome."""
+    candidates = database.list_automation_candidates(minimum_score=AUTOMATION_MINIMUM_SCORE, limit=AUTOMATION_MAX_APPLICATIONS_PER_RUN)
+    audit = AcquisitionAuditStore(database); submitted = 0
     for row in candidates:
-        job = row_to_job(row)
-        result = pipeline(job, row["id"], profile)
+        job = row_to_job(row); result = pipeline(job, row["id"], profile)
         package_path = str(result.package.archive) if result.package is not None else ""
         automation_status = result.automation.status if result.automation is not None else ""
         audit.record(row["id"], result.decision, package_path=package_path, automation_status=automation_status)
-
         if not result.decision.should_apply:
-            database.record_queue_audit(row["id"], "ATS_PIPELINE", "REJECTED", result.decision.reason)
-            continue
+            database.record_queue_audit(row["id"], "ATS_PIPELINE", "REJECTED", result.decision.reason); continue
         if result.automation is None:
-            database.record_queue_audit(row["id"], "ATS_PIPELINE", "REJECTED", "Application pipeline produced no browser result")
-            continue
+            database.record_queue_audit(row["id"], "ATS_PIPELINE", "REJECTED", "Application pipeline produced no browser result"); continue
 
-        database.record_automation_attempt(
-            row["id"], result.automation.status, result.automation.message, result.automation.screenshot
-        )
+        database.record_automation_attempt(row["id"], result.automation.status, result.automation.message, result.automation.screenshot)
+        outcome = classify_outcome(result.automation)
+        record_outcome(database.connection, row["id"], outcome)
         final_state = reconcile_application_outcome(database, row["id"], result.automation)
-        if final_state == "APPLIED":
-            database.record_queue_audit(row["id"], "ATS_PIPELINE", "SUBMITTED", result.decision.reason)
-            submitted += 1
-        elif final_state == "PREPARING":
-            database.record_queue_audit(row["id"], "ATS_PIPELINE", "HUMAN_REQUIRED", result.automation.message)
+        if outcome.applied or final_state == "APPLIED":
+            database.record_queue_audit(row["id"], "ATS_PIPELINE", "SUBMITTED", outcome.reason or result.decision.reason); submitted += 1
+        elif outcome.human_required or final_state == "PREPARING":
+            database.record_queue_audit(row["id"], "ATS_PIPELINE", "HUMAN_REQUIRED", outcome.reason or result.automation.message)
+        elif outcome.retry_later:
+            database.record_queue_audit(row["id"], "ATS_PIPELINE", "RETRYABLE", outcome.reason)
         else:
-            database.record_queue_audit(row["id"], "ATS_PIPELINE", "RETRYABLE", result.automation.message)
+            database.record_queue_audit(row["id"], "ATS_PIPELINE", "FAILED", outcome.reason or result.automation.message)
     return submitted
 
 
 def main() -> int:
-    profile = load_profile()
-    database = Database()
+    profile = load_profile(); database = Database()
     try:
-        process_runtime_queue(database, profile)
-        return 0
-    finally:
-        database.close()
+        process_runtime_queue(database, profile); return 0
+    finally: database.close()
 
 
-if __name__ == "__main__":
-    raise SystemExit(main())
+if __name__ == "__main__": raise SystemExit(main())
