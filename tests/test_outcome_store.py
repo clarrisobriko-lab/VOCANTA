@@ -1,12 +1,14 @@
 import sqlite3
 
-from core.outcome_store import ensure_outcome_schema, outcome_statistics, record_outcome
+from core.outcome_store import outcome_statistics, record_outcome
 from intelligence.application_outcomes import Outcome
 
 
 def connection():
     db = sqlite3.connect(":memory:")
     db.execute("CREATE TABLE jobs(id INTEGER PRIMARY KEY, applied INTEGER DEFAULT 0, status TEXT DEFAULT 'NEW', applied_date TEXT, updated_at TEXT)")
+    db.execute("INSERT INTO jobs(id, applied, status) VALUES(1, 0, 'NEW')")
+    db.commit()
     return db
 
 
