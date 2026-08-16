@@ -18,6 +18,12 @@ jobs:
     timeout-minutes: 10
     env:
       VOCANTA_GMAIL_TOKEN_JSON: ${{ secrets.VOCANTA_GMAIL_TOKEN_JSON }}
+      VOCANTA_SMTP_HOST: ${{ secrets.VOCANTA_SMTP_HOST }}
+      VOCANTA_SMTP_PORT: ${{ secrets.VOCANTA_SMTP_PORT }}
+      VOCANTA_SMTP_USERNAME: ${{ secrets.VOCANTA_SMTP_USERNAME }}
+      VOCANTA_SMTP_PASSWORD: ${{ secrets.VOCANTA_SMTP_PASSWORD }}
+      VOCANTA_SMTP_FROM: ${{ secrets.VOCANTA_SMTP_FROM }}
+      VOCANTA_ALERT_RECIPIENT: ${{ secrets.VOCANTA_ALERT_RECIPIENT }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
