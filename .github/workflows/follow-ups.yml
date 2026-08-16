@@ -8,6 +8,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: vocanta-follow-ups
+  cancel-in-progress: false
+
 jobs:
   follow-ups:
     runs-on: ubuntu-24.04
@@ -27,3 +31,14 @@ jobs:
       - run: pip install -r requirements.txt
       - name: Run follow-up cycle
         run: python follow_up_runtime.py
+      - name: Publish follow-up analytics
+        if: always()
+        run: python analytics.py
+      - name: Upload follow-up analytics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: vocanta-follow-up-analytics-${{ github.run_id }}
+          path: exports/analytics.html
+          if-no-files-found: warn
+          retention-days: 14
