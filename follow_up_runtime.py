@@ -30,14 +30,18 @@ def build_recipient_resolver(fetcher=fetch_public_job_text):
     return resolve
 
 
+def smtp_configured() -> bool:
+    return all(os.getenv(key,"").strip() for key in ("VOCANTA_SMTP_HOST","VOCANTA_SMTP_USERNAME","VOCANTA_SMTP_PASSWORD"))
+
+
 def build_sender_from_environment() -> SMTPFollowUpSender:
     host=os.getenv("VOCANTA_SMTP_HOST","").strip()
     username=os.getenv("VOCANTA_SMTP_USERNAME","").strip()
     password=os.getenv("VOCANTA_SMTP_PASSWORD","")
     if not host or not username or not password:
         raise RuntimeError("Follow-up email is not configured. Set VOCANTA_SMTP_HOST, VOCANTA_SMTP_USERNAME and VOCANTA_SMTP_PASSWORD.")
-    port=int(os.getenv("VOCANTA_SMTP_PORT","587"))
-    from_address=os.getenv("VOCANTA_SMTP_FROM",username).strip()
+    port=int(os.getenv("VOCANTA_SMTP_PORT","").strip() or "587")
+    from_address=os.getenv("VOCANTA_SMTP_FROM","").strip() or username
     use_tls=os.getenv("VOCANTA_SMTP_TLS","1").strip().lower() not in {"0","false","no"}
     return SMTPFollowUpSender(host,port,username,password,from_address,use_tls=use_tls)
 
@@ -53,9 +57,12 @@ def run_follow_up_runtime(*, sender=None, recipient_resolver=None, now=None):
 
 
 def main() -> int:
+    if not smtp_configured():
+        print("VOCANTA follow-up runtime: SMTP not configured; delivery skipped safely")
+        return 0
     results=run_follow_up_runtime()
     sent=sum(1 for result in results if result.status=="SENT")
-    pending=sum(1 for result in results if result.status in {"NO_RECIPIENT","FAILED"})
+    pending=sum(1 for result in results if result.status in {"NO_RECIPIENT","FAILED","RETRYABLE"})
     print(f"VOCANTA follow-up runtime: {sent} sent, {pending} pending")
     return 0
 
