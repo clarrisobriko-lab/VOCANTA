@@ -1,0 +1,29 @@
+name: VOCANTA Follow Ups
+
+on:
+  schedule:
+    - cron: '17 8 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  follow-ups:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      VOCANTA_SMTP_HOST: ${{ secrets.VOCANTA_SMTP_HOST }}
+      VOCANTA_SMTP_PORT: ${{ secrets.VOCANTA_SMTP_PORT }}
+      VOCANTA_SMTP_USERNAME: ${{ secrets.VOCANTA_SMTP_USERNAME }}
+      VOCANTA_SMTP_PASSWORD: ${{ secrets.VOCANTA_SMTP_PASSWORD }}
+      VOCANTA_SMTP_FROM: ${{ secrets.VOCANTA_SMTP_FROM }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+          cache: pip
+      - run: pip install -r requirements.txt
+      - name: Run follow-up cycle
+        run: python follow_up_runtime.py
