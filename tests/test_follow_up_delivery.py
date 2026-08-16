@@ -36,8 +36,11 @@ def test_missing_recipient_is_not_guessed_or_completed():
     assert c.execute("SELECT status FROM application_follow_ups").fetchone()[0]=='PENDING'
 
 
-def test_delivery_failure_remains_pending_for_later_retry():
+def test_delivery_failure_is_scheduled_for_later_retry():
     c=db(); sender=Sender(fail=True)
     results=process_follow_ups(c,'Test Candidate',lambda company,url:'jobs@acme.test',sender,now=NOW)
-    assert results[0].status=='FAILED'
-    assert c.execute("SELECT status FROM application_follow_ups").fetchone()[0]=='PENDING'
+    assert results[0].status=='RETRYABLE'
+    row=c.execute("SELECT status,attempt_count,next_attempt_at FROM application_follow_ups").fetchone()
+    assert row['status']=='PENDING'
+    assert row['attempt_count']==1
+    assert row['next_attempt_at']
