@@ -1,15 +1,28 @@
 from __future__ import annotations
 
-from core.employer_reply_store import mark_reply_send_failed, mark_reply_sent
+from core.employer_reply_store import ensure_reply_schema, mark_reply_send_failed, mark_reply_sent
+
+
+def _thread_context(connection,message_id: str):
+    try:
+        return connection.execute("SELECT sender,thread_id,internet_message_id,references_header FROM employer_responses WHERE message_id=?",(message_id,)).fetchone()
+    except Exception:
+        return None
 
 
 def send_approved_reply(connection,message_id: str,recipient: str | None,sender) -> bool:
-    row=connection.execute("SELECT d.subject,d.body,d.status,r.sender,r.thread_id,r.internet_message_id,r.references_header FROM employer_reply_drafts d JOIN employer_responses r ON r.message_id=d.message_id WHERE d.message_id=?",(message_id,)).fetchone()
+    ensure_reply_schema(connection)
+    row=connection.execute("SELECT subject,body,status FROM employer_reply_drafts WHERE message_id=?",(message_id,)).fetchone()
     if row is None or str(row[2])!='APPROVED': return False
-    target=(recipient or str(row[3])).strip()
+    context=_thread_context(connection,message_id)
+    stored_recipient=str(context[0]) if context is not None else ''
+    target=(recipient or stored_recipient).strip()
     if not target: return False
     try:
-        sender.send(target,str(row[0]),str(row[1]),thread_id=str(row[4]),in_reply_to=str(row[5]),references=str(row[6]))
+        if context is not None:
+            sender.send(target,str(row[0]),str(row[1]),thread_id=str(context[1]),in_reply_to=str(context[2]),references=str(context[3]))
+        else:
+            sender.send(target,str(row[0]),str(row[1]))
     except TypeError:
         try: sender.send(target,str(row[0]),str(row[1]))
         except Exception as exc: mark_reply_send_failed(connection,message_id,str(exc)); return False
