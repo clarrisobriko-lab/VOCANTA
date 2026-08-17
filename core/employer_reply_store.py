@@ -41,11 +41,18 @@ def approve_reply_draft(connection,message_id: str,*,now=None) -> bool:
     return cursor.rowcount==1
 
 
+def claim_reply_send(connection,message_id: str,*,now=None) -> bool:
+    ensure_reply_schema(connection)
+    cursor=connection.execute("UPDATE employer_reply_drafts SET status='SENDING',last_error=NULL WHERE message_id=? AND status='APPROVED'",(message_id,)); connection.commit()
+    if cursor.rowcount==1: record_reply_event(connection,message_id,'SEND_CLAIMED',now=now)
+    return cursor.rowcount==1
+
+
 def mark_reply_sent(connection,message_id: str,*,now=None) -> None:
-    ensure_reply_schema(connection); stamp=_stamp(now); cursor=connection.execute("UPDATE employer_reply_drafts SET status='SENT',sent_at=?,last_error=NULL WHERE message_id=? AND status='APPROVED'",(stamp,message_id)); connection.commit()
+    ensure_reply_schema(connection); stamp=_stamp(now); cursor=connection.execute("UPDATE employer_reply_drafts SET status='SENT',sent_at=?,last_error=NULL WHERE message_id=? AND status='SENDING'",(stamp,message_id)); connection.commit()
     if cursor.rowcount==1: record_reply_event(connection,message_id,'SENT',now=now)
 
 
 def mark_reply_send_failed(connection,message_id: str,error: str,*,now=None) -> None:
-    ensure_reply_schema(connection); detail=str(error)[:500]; cursor=connection.execute("UPDATE employer_reply_drafts SET last_error=? WHERE message_id=? AND status='APPROVED'",(detail,message_id)); connection.commit()
+    ensure_reply_schema(connection); detail=str(error)[:500]; cursor=connection.execute("UPDATE employer_reply_drafts SET status='APPROVED',last_error=? WHERE message_id=? AND status='SENDING'",(detail,message_id)); connection.commit()
     if cursor.rowcount==1: record_reply_event(connection,message_id,'SEND_FAILED',detail,now=now)
