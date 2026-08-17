@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 
+from config.settings import REPLY_ARCHIVE_RETENTION_DAYS, REPLY_AUDIT_RETENTION_DAYS
 from intelligence.employer_reply_drafts import ReplyDraft
 
 SEND_CLAIM_MINUTES=10
@@ -27,6 +28,16 @@ def ensure_reply_schema(connection) -> None:
     connection.execute("CREATE INDEX IF NOT EXISTS idx_reply_audit_message_id ON employer_reply_audit(message_id,id DESC)")
     connection.execute("CREATE INDEX IF NOT EXISTS idx_reply_audit_created ON employer_reply_audit(created_at DESC)")
     connection.commit()
+
+
+def apply_reply_retention(connection,*,now=None,audit_days=REPLY_AUDIT_RETENTION_DAYS,archive_days=REPLY_ARCHIVE_RETENTION_DAYS):
+    ensure_reply_schema(connection); current=now or datetime.now(timezone.utc); audit_days=max(30,int(audit_days)); archive_days=max(30,int(archive_days)); audit_cutoff=(current-timedelta(days=audit_days)).isoformat(); archive_cutoff=(current-timedelta(days=archive_days)).isoformat()
+    old_archived=[str(row[0]) for row in connection.execute("SELECT message_id FROM employer_reply_drafts WHERE status='SENT' AND archived_at IS NOT NULL AND archived_at<?",(archive_cutoff,)).fetchall()]
+    deleted_archives=0
+    if old_archived:
+        placeholders=','.join('?' for _ in old_archived); connection.execute(f"DELETE FROM employer_reply_audit WHERE message_id IN ({placeholders})",old_archived); deleted_archives=connection.execute(f"DELETE FROM employer_reply_drafts WHERE message_id IN ({placeholders})",old_archived).rowcount
+    deleted_audit=connection.execute("DELETE FROM employer_reply_audit WHERE created_at<? AND message_id NOT IN (SELECT message_id FROM employer_reply_drafts WHERE archived_at IS NOT NULL)",(audit_cutoff,)).rowcount
+    connection.commit(); return {'archived_replies':deleted_archives,'audit_events':deleted_audit}
 
 
 def record_reply_event(connection,message_id: str,event: str,detail: str='',*,now=None) -> None:
