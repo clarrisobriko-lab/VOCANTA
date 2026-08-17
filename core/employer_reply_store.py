@@ -16,6 +16,13 @@ def ensure_reply_schema(connection) -> None:
     for name in ('approved_at','sent_at','last_error','send_claimed_at','gmail_sent_message_id','archived_at'):
         if name not in columns: connection.execute(f"ALTER TABLE employer_reply_drafts ADD COLUMN {name} TEXT")
     connection.execute("CREATE TABLE IF NOT EXISTS employer_reply_audit(id INTEGER PRIMARY KEY AUTOINCREMENT,message_id TEXT NOT NULL,event TEXT NOT NULL,detail TEXT NOT NULL DEFAULT '',created_at TEXT NOT NULL)")
+    connection.execute("CREATE INDEX IF NOT EXISTS idx_reply_status_archive_created ON employer_reply_drafts(status,archived_at,created_at DESC)")
+    connection.execute("CREATE INDEX IF NOT EXISTS idx_reply_status_archive_sent ON employer_reply_drafts(status,archived_at,sent_at DESC)")
+    connection.execute("CREATE INDEX IF NOT EXISTS idx_reply_status_claim ON employer_reply_drafts(status,send_claimed_at)")
+    connection.execute("CREATE INDEX IF NOT EXISTS idx_reply_job ON employer_reply_drafts(job_id)")
+    connection.execute("CREATE INDEX IF NOT EXISTS idx_reply_gmail_message ON employer_reply_drafts(gmail_sent_message_id)")
+    connection.execute("CREATE INDEX IF NOT EXISTS idx_reply_audit_message_id ON employer_reply_audit(message_id,id DESC)")
+    connection.execute("CREATE INDEX IF NOT EXISTS idx_reply_audit_created ON employer_reply_audit(created_at DESC)")
     connection.commit()
 
 
