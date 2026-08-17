@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 
+from config.settings import REPLY_RETENTION_ALERT_THRESHOLD
 from core.database import Database
 from core.employer_reply_store import apply_reply_retention
 from automation.email_transport import SMTPAlertSender
@@ -22,11 +23,27 @@ def build_alert_sender_from_environment():
     return SMTPAlertSender(host,port,username,password,recipient,from_address,use_tls=use_tls)
 
 
+def retention_volume(retention: dict) -> int:
+    return int(retention.get('archived_replies',0))+int(retention.get('audit_events',0))
+
+
+def retention_alert_required(retention: dict,threshold=REPLY_RETENTION_ALERT_THRESHOLD) -> bool:
+    return retention_volume(retention)>=max(1,int(threshold))
+
+
+def notify_retention_volume(retention: dict,alert_sender,threshold=REPLY_RETENTION_ALERT_THRESHOLD) -> bool:
+    if alert_sender is None or not retention_alert_required(retention,threshold): return False
+    subject='VOCANTA retention volume alert'; body=f"Retention removed {retention.get('archived_replies',0)} archived replies and {retention.get('audit_events',0)} audit events. Total removed: {retention_volume(retention)}. Alert threshold: {max(1,int(threshold))}."
+    try: alert_sender.send(subject,body); return True
+    except Exception as exc: print(f"VOCANTA retention alert failed: {exc}"); return False
+
+
 def run_inbox_runtime(messages, *, database=None, alert_sender=None, retention_report=None):
     owns_database=database is None; database=database or Database()
     try:
         retention=apply_reply_retention(database.connection)
         if retention_report is not None: retention_report.update(retention)
+        notify_retention_volume(retention,alert_sender)
         results=process_inbox_messages(database.connection,[normalize_mail_message(message) for message in messages])
         if alert_sender is not None: notify_processed_responses(database.connection,results,alert_sender)
         return results
