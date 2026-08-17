@@ -3,11 +3,12 @@ from rich.console import Console
 from rich.table import Table
 from config.settings import APP_DISPLAY_NAME, EXPORT_DIR, SHORTLIST_SCORE
 from core.database import Database
-from core.employer_reply_store import latest_reply_retention
+from core.employer_reply_store import ensure_reply_schema, latest_reply_retention
 from intelligence.employer_responses import EmployerResponse
 from intelligence.response_actions import action_for_response
 ANALYTICS_FILE=EXPORT_DIR/"analytics.html"
 PAGE_SIZE=10
+RETENTION_TREND_LIMIT=30
 
 def _like(query): return f"%{(query or '').strip().casefold()}%"
 def filter_records(records,query=''):
@@ -17,6 +18,15 @@ def filter_records(records,query=''):
 def paginate_records(records,page=1,page_size=PAGE_SIZE):
     records=list(records); page_size=max(1,int(page_size)); pages=max(1,(len(records)+page_size-1)//page_size); page=max(1,min(int(page),pages)); start=(page-1)*page_size
     return records[start:start+page_size],{'page':page,'pages':pages,'total':len(records),'page_size':page_size}
+def retention_history(connection,limit=RETENTION_TREND_LIMIT):
+    ensure_reply_schema(connection); limit=max(1,min(365,int(limit))); rows=connection.execute("SELECT archived_replies,audit_events,created_at FROM employer_reply_retention_runs ORDER BY id DESC LIMIT ?",(limit,)).fetchall()
+    return [{'archived_replies':int(r[0]),'audit_events':int(r[1]),'total_removed':int(r[0])+int(r[1]),'created_at':str(r[2])} for r in rows]
+def retention_trend(connection,limit=RETENTION_TREND_LIMIT):
+    history=retention_history(connection,limit)
+    if not history: return {'runs':0,'total_removed':0,'average_removed':0.0,'peak_removed':0,'latest_removed':0,'direction':'flat'}
+    totals=[item['total_removed'] for item in history]; recent=totals[:min(5,len(totals))]; previous=totals[min(5,len(totals)):min(10,len(totals))]; recent_average=sum(recent)/len(recent); previous_average=sum(previous)/len(previous) if previous else recent_average
+    direction='up' if recent_average>previous_average else ('down' if recent_average<previous_average else 'flat')
+    return {'runs':len(history),'total_removed':sum(totals),'average_removed':round(sum(totals)/len(totals),2),'peak_removed':max(totals),'latest_removed':totals[0],'direction':direction}
 def reply_drafts(connection,status):
     try: rows=connection.execute("SELECT d.message_id,d.subject,d.body,d.created_at,j.company,j.title FROM employer_reply_drafts d JOIN jobs j ON j.id=d.job_id WHERE d.status=? AND d.archived_at IS NULL ORDER BY d.created_at DESC",(status,)).fetchall()
     except Exception: return []
@@ -50,19 +60,19 @@ def response_actions(connection):
     for row in rows:
         response=EmployerResponse(str(row[0]),int(row[1]),str(row[2])); action=action_for_response(response); items.append({'priority':action.priority,'action':action.action,'company':str(row[6]),'title':str(row[7]),'classification':response.status,'subject':str(row[4])})
     order={'URGENT':0,'HIGH':1,'MEDIUM':2,'LOW':3}; return sorted(items,key=lambda item:order.get(item['priority'],9))
-def build_query_html(scope,query,items,meta,retention=None):
-    retention=retention or {'archived_replies':0,'audit_events':0,'created_at':''}; q=escape(query,quote=True); scope=scope if scope in {'pending','approved','delivered','archived','audit'} else 'audit'; rows=[]
+def build_query_html(scope,query,items,meta,retention=None,trend=None):
+    retention=retention or {'archived_replies':0,'audit_events':0,'created_at':''}; trend=trend or {'runs':0,'total_removed':0,'average_removed':0,'peak_removed':0,'latest_removed':0,'direction':'flat'}; q=escape(query,quote=True); scope=scope if scope in {'pending','approved','delivered','archived','audit'} else 'audit'; rows=[]
     for item in items:
         if scope in {'pending','approved'}: rows.append(f"<tr><td>{escape(item['company'])}</td><td>{escape(item['title'])}</td><td>{escape(item['subject'])}</td><td>{escape(item['created_at'])}</td></tr>")
         elif scope in {'delivered','archived'}: rows.append(f"<tr><td>{escape(item['company'])}</td><td>{escape(item['title'])}</td><td>{escape(item['subject'])}</td><td><code>{escape(item['gmail_message_id'])}</code></td></tr>")
         else: rows.append(f"<tr><td>{escape(item['created_at'])}</td><td>{escape(item['company'])}</td><td>{escape(item['title'])}</td><td>{escape(item['event'])}</td><td>{escape(item['detail'])}</td></tr>")
     headers='<th>Company</th><th>Role</th><th>Subject</th><th>Time</th>' if scope in {'pending','approved'} else ('<th>Company</th><th>Role</th><th>Subject</th><th>Gmail message ID</th>' if scope in {'delivered','archived'} else '<th>Time</th><th>Company</th><th>Role</th><th>Event</th><th>Detail</th>'); prev=max(1,meta['page']-1); nxt=min(meta['pages'],meta['page']+1)
-    return f"<!doctype html><html><head><meta charset='utf8'><title>{APP_DISPLAY_NAME} Reply Records</title></head><body><h1>Reply records</h1><p>Last retention run: {escape(retention['created_at']) or 'not yet run'}. Removed {retention['archived_replies']} archived replies and {retention['audit_events']} audit events.</p><form method='get'><input name='q' value='{q}'><select name='scope'>{''.join(f'<option value={s}>{s.title()}</option>' for s in ('pending','approved','delivered','archived','audit'))}</select><button>Search</button></form><p>{meta['total']} records</p><table><thead><tr>{headers}</tr></thead><tbody>{''.join(rows) or '<tr><td>No records found.</td></tr>'}</tbody></table><nav><a href='/?scope={scope}&q={q}&page={prev}'>Previous</a><span>Page {meta['page']} of {meta['pages']}</span><a href='/?scope={scope}&q={q}&page={nxt}'>Next</a></nav></body></html>"
+    return f"<!doctype html><html><head><meta charset='utf8'><title>{APP_DISPLAY_NAME} Reply Records</title></head><body><h1>Reply records</h1><p>Last retention run: {escape(retention['created_at']) or 'not yet run'}. Removed {retention['archived_replies']} archived replies and {retention['audit_events']} audit events.</p><p>Retention trend across {trend['runs']} runs: {trend['direction']}. Latest {trend['latest_removed']}, average {trend['average_removed']}, peak {trend['peak_removed']}, total {trend['total_removed']} records removed.</p><form method='get'><input name='q' value='{q}'><select name='scope'>{''.join(f'<option value={s}>{s.title()}</option>' for s in ('pending','approved','delivered','archived','audit'))}</select><button>Search</button></form><p>{meta['total']} records</p><table><thead><tr>{headers}</tr></thead><tbody>{''.join(rows) or '<tr><td>No records found.</td></tr>'}</tbody></table><nav><a href='/?scope={scope}&q={q}&page={prev}'>Previous</a><span>Page {meta['page']} of {meta['pages']}</span><a href='/?scope={scope}&q={q}&page={nxt}'>Next</a></nav></body></html>"
 def main():
     console=Console(); database=Database()
     try:
-        data=database.analytics(SHORTLIST_SCORE); retention=latest_reply_retention(database.connection); table=Table(title=f"{APP_DISPLAY_NAME} Pipeline Analytics"); table.add_column('Metric'); table.add_column('Value',justify='right')
-        for label,value in [('Shortlisted',data['shortlisted']),('Applications',data['applied']),('Interviews',data['interviews']),('Offers',data['offers']),('Last retention archives removed',retention['archived_replies']),('Last retention audit events removed',retention['audit_events'])]: table.add_row(label,str(value))
+        data=database.analytics(SHORTLIST_SCORE); retention=latest_reply_retention(database.connection); trend=retention_trend(database.connection); table=Table(title=f"{APP_DISPLAY_NAME} Pipeline Analytics"); table.add_column('Metric'); table.add_column('Value',justify='right')
+        for label,value in [('Shortlisted',data['shortlisted']),('Applications',data['applied']),('Interviews',data['interviews']),('Offers',data['offers']),('Last retention archives removed',retention['archived_replies']),('Last retention audit events removed',retention['audit_events']),('Retention runs analysed',trend['runs']),('Retention average removed',trend['average_removed']),('Retention peak removed',trend['peak_removed']),('Retention trend',trend['direction'])]: table.add_row(label,str(value))
         console.print(table); return 0
     finally: database.close()
 if __name__=='__main__': raise SystemExit(main())
