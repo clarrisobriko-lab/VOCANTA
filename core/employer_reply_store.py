@@ -7,6 +7,7 @@ from intelligence.employer_reply_drafts import ReplyDraft
 
 SEND_CLAIM_MINUTES=10
 RETENTION_ALERT_HISTORY_LIMIT=500
+RETENTION_RUN_HISTORY_LIMIT=1000
 
 
 def _stamp(now=None): return (now or datetime.now(timezone.utc)).isoformat()
@@ -33,31 +34,30 @@ def ensure_reply_schema(connection) -> None:
     connection.commit()
 
 
-def apply_reply_retention(connection,*,now=None,audit_days=REPLY_AUDIT_RETENTION_DAYS,archive_days=REPLY_ARCHIVE_RETENTION_DAYS):
+def prune_retention_run_history(connection,limit=RETENTION_RUN_HISTORY_LIMIT):
+    ensure_reply_schema(connection); limit=max(1,int(limit)); cursor=connection.execute("DELETE FROM employer_reply_retention_runs WHERE id NOT IN (SELECT id FROM employer_reply_retention_runs ORDER BY id DESC LIMIT ?)",(limit,)); connection.commit(); return cursor.rowcount
+
+
+def apply_reply_retention(connection,*,now=None,audit_days=REPLY_AUDIT_RETENTION_DAYS,archive_days=REPLY_ARCHIVE_RETENTION_DAYS,history_limit=RETENTION_RUN_HISTORY_LIMIT):
     ensure_reply_schema(connection); current=now or datetime.now(timezone.utc); audit_days=max(30,int(audit_days)); archive_days=max(30,int(archive_days)); audit_cutoff=(current-timedelta(days=audit_days)).isoformat(); archive_cutoff=(current-timedelta(days=archive_days)).isoformat()
     old_archived=[str(row[0]) for row in connection.execute("SELECT message_id FROM employer_reply_drafts WHERE status='SENT' AND archived_at IS NOT NULL AND archived_at<?",(archive_cutoff,)).fetchall()]; deleted_archives=0
     if old_archived:
         placeholders=','.join('?' for _ in old_archived); connection.execute(f"DELETE FROM employer_reply_audit WHERE message_id IN ({placeholders})",old_archived); deleted_archives=connection.execute(f"DELETE FROM employer_reply_drafts WHERE message_id IN ({placeholders})",old_archived).rowcount
     deleted_audit=connection.execute("DELETE FROM employer_reply_audit WHERE created_at<? AND message_id NOT IN (SELECT message_id FROM employer_reply_drafts WHERE archived_at IS NOT NULL)",(audit_cutoff,)).rowcount
-    result={'archived_replies':deleted_archives,'audit_events':deleted_audit}; connection.execute("INSERT INTO employer_reply_retention_runs(archived_replies,audit_events,created_at) VALUES(?,?,?)",(deleted_archives,deleted_audit,_stamp(current))); connection.commit(); return result
+    result={'archived_replies':deleted_archives,'audit_events':deleted_audit}; connection.execute("INSERT INTO employer_reply_retention_runs(archived_replies,audit_events,created_at) VALUES(?,?,?)",(deleted_archives,deleted_audit,_stamp(current))); connection.commit(); prune_retention_run_history(connection,history_limit); return result
 
 
 def retention_alert_signature(retention): return f"{int(retention.get('archived_replies',0))}:{int(retention.get('audit_events',0))}"
-
 def retention_alert_seen(connection,retention):
     ensure_reply_schema(connection); return connection.execute("SELECT 1 FROM employer_reply_retention_alerts WHERE signature=?",(retention_alert_signature(retention),)).fetchone() is not None
-
 def prune_retention_alert_history(connection,limit=RETENTION_ALERT_HISTORY_LIMIT):
     ensure_reply_schema(connection); limit=max(1,int(limit)); cursor=connection.execute("DELETE FROM employer_reply_retention_alerts WHERE signature NOT IN (SELECT signature FROM employer_reply_retention_alerts ORDER BY alerted_at DESC, signature DESC LIMIT ?)",(limit,)); connection.commit(); return cursor.rowcount
-
 def mark_retention_alerted(connection,retention,*,now=None,history_limit=RETENTION_ALERT_HISTORY_LIMIT):
     ensure_reply_schema(connection); connection.execute("INSERT OR REPLACE INTO employer_reply_retention_alerts(signature,alerted_at) VALUES(?,?)",(retention_alert_signature(retention),_stamp(now))); connection.commit(); prune_retention_alert_history(connection,history_limit)
-
 
 def latest_reply_retention(connection):
     ensure_reply_schema(connection); row=connection.execute("SELECT archived_replies,audit_events,created_at FROM employer_reply_retention_runs ORDER BY id DESC LIMIT 1").fetchone()
     return {'archived_replies':int(row[0]),'audit_events':int(row[1]),'created_at':str(row[2])} if row else {'archived_replies':0,'audit_events':0,'created_at':''}
-
 
 def record_reply_event(connection,message_id: str,event: str,detail: str='',*,now=None) -> None:
     ensure_reply_schema(connection); connection.execute("INSERT INTO employer_reply_audit(message_id,event,detail,created_at) VALUES(?,?,?,?)",(message_id,event,detail[:1000],_stamp(now))); connection.commit()
