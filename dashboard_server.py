@@ -10,7 +10,7 @@ from automation.gmail_auth import build_gmail_service
 from automation.gmail_reply_sender import GmailReplySender
 from automation.profile import load_profile
 from core.database import Database
-from core.employer_reply_store import approve_reply_draft, update_reply_draft
+from core.employer_reply_store import approve_reply_draft, archive_reply, update_reply_draft
 
 
 class DashboardHandler(BaseHTTPRequestHandler):
@@ -20,16 +20,17 @@ class DashboardHandler(BaseHTTPRequestHandler):
         self.send_response(200); self.send_header('Content-Type','text/html; charset=utf8'); self.send_header('Content-Length',str(len(content))); self.end_headers(); self.wfile.write(content)
 
     def do_POST(self):
-        if self.path not in {'/edit','/approve','/send'}: self.send_error(404); return
+        if self.path not in {'/edit','/approve','/send','/archive'}: self.send_error(404); return
         length=int(self.headers.get('Content-Length','0')); data=parse_qs(self.rfile.read(length).decode()); message_id=(data.get('message_id') or [''])[0]
         database=Database()
         try:
             if self.path=='/edit':
                 subject=(data.get('subject') or [''])[0]; body=(data.get('body') or [''])[0]; update_reply_draft(database.connection,message_id,subject,body)
             elif self.path=='/approve': approve_reply_draft(database.connection,message_id)
+            elif self.path=='/archive': archive_reply(database.connection,message_id)
             else:
-                row=database.connection.execute("SELECT status FROM employer_reply_drafts WHERE message_id=?",(message_id,)).fetchone()
-                if row is not None and str(row[0])=='APPROVED':
+                row=database.connection.execute("SELECT status,archived_at FROM employer_reply_drafts WHERE message_id=?",(message_id,)).fetchone()
+                if row is not None and str(row[0])=='APPROVED' and row[1] is None:
                     profile=load_profile(); service=build_gmail_service(); sender=GmailReplySender(service,profile.email); send_approved_reply(database.connection,message_id,None,sender)
         finally: database.close()
         self.send_response(303); self.send_header('Location','/'); self.end_headers()
