@@ -49,6 +49,12 @@ def archive_reply(connection,message_id: str,*,now=None) -> bool:
     return cursor.rowcount==1
 
 
+def restore_reply(connection,message_id: str,*,now=None) -> bool:
+    ensure_reply_schema(connection); cursor=connection.execute("UPDATE employer_reply_drafts SET archived_at=NULL WHERE message_id=? AND status='SENT' AND archived_at IS NOT NULL",(message_id,)); connection.commit()
+    if cursor.rowcount==1: record_reply_event(connection,message_id,'RESTORED',now=now)
+    return cursor.rowcount==1
+
+
 def recover_stale_reply_sends(connection,*,now=None,minutes=SEND_CLAIM_MINUTES) -> int:
     ensure_reply_schema(connection); current=now or datetime.now(timezone.utc); cutoff=(current-timedelta(minutes=minutes)).isoformat()
     rows=connection.execute("SELECT message_id FROM employer_reply_drafts WHERE status='SENDING' AND archived_at IS NULL AND (send_claimed_at IS NULL OR send_claimed_at<=?)",(cutoff,)).fetchall()
