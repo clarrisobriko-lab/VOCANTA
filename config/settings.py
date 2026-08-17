@@ -12,12 +12,10 @@ LOG_DIR = BASE_DIR / "logs"
 EXPORT_DIR = BASE_DIR / "exports"
 APPLICATIONS_DIR = BASE_DIR / "application_workspace"
 MIGRATION_MARKER_FILE = DATA_DIR / ".migration_complete"
-
 PACKAGE_ASSETS_DIR = BASE_DIR / "assets"
 USER_DATA_DIR = Path(os.getenv("LOCALAPPDATA", Path.home() / "AppData" / "Local")) / "VOCANTA"
 USER_DATA_DIR.mkdir(parents=True, exist_ok=True)
 ASSETS_DIR = USER_DATA_DIR / "assets"
-
 PACKAGED_MASTER_CV_FILE = PACKAGE_ASSETS_DIR / "master_cv.docx"
 PACKAGED_MASTER_COVER_LETTER_FILE = PACKAGE_ASSETS_DIR / "master_cover_letter.docx"
 PACKAGED_EXECUTIVE_ASSISTANT_CERTIFICATE_FILE = PACKAGE_ASSETS_DIR / "executive_assistant_certificate.pdf"
@@ -60,6 +58,8 @@ MAX_CONNECTOR_WORKERS = 8
 MINIMUM_SCORE = 35
 SHORTLIST_SCORE = 60
 MAX_DASHBOARD_ROWS = 60
+REPLY_AUDIT_RETENTION_DAYS = max(30, int(os.getenv("VOCANTA_REPLY_AUDIT_RETENTION_DAYS", "365")))
+REPLY_ARCHIVE_RETENTION_DAYS = max(30, int(os.getenv("VOCANTA_REPLY_ARCHIVE_RETENTION_DAYS", "730")))
 ARBEITNOW_MAX_PAGES = 5
 HIMALAYAS_MAX_PAGES = 0
 DISABLED_CONNECTORS = {"arbeitnow", "ashby", "himalayas", "jobicy", "lever", "remoteok", "remotive", "smartrecruiters"}
