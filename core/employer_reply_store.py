@@ -1,17 +1,19 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from intelligence.employer_reply_drafts import ReplyDraft
+
+SEND_CLAIM_MINUTES=10
 
 
 def _stamp(now=None): return (now or datetime.now(timezone.utc)).isoformat()
 
 
 def ensure_reply_schema(connection) -> None:
-    connection.execute("CREATE TABLE IF NOT EXISTS employer_reply_drafts(message_id TEXT PRIMARY KEY,job_id INTEGER NOT NULL,subject TEXT NOT NULL,body TEXT NOT NULL,status TEXT NOT NULL DEFAULT 'AWAITING_APPROVAL',created_at TEXT NOT NULL,approved_at TEXT,sent_at TEXT,last_error TEXT)")
+    connection.execute("CREATE TABLE IF NOT EXISTS employer_reply_drafts(message_id TEXT PRIMARY KEY,job_id INTEGER NOT NULL,subject TEXT NOT NULL,body TEXT NOT NULL,status TEXT NOT NULL DEFAULT 'AWAITING_APPROVAL',created_at TEXT NOT NULL,approved_at TEXT,sent_at TEXT,last_error TEXT,send_claimed_at TEXT)")
     columns={r[1] for r in connection.execute("PRAGMA table_info(employer_reply_drafts)").fetchall()}
-    for name in ('approved_at','sent_at','last_error'):
+    for name in ('approved_at','sent_at','last_error','send_claimed_at'):
         if name not in columns: connection.execute(f"ALTER TABLE employer_reply_drafts ADD COLUMN {name} TEXT")
     connection.execute("CREATE TABLE IF NOT EXISTS employer_reply_audit(id INTEGER PRIMARY KEY AUTOINCREMENT,message_id TEXT NOT NULL,event TEXT NOT NULL,detail TEXT NOT NULL DEFAULT '',created_at TEXT NOT NULL)")
     connection.commit()
@@ -41,18 +43,26 @@ def approve_reply_draft(connection,message_id: str,*,now=None) -> bool:
     return cursor.rowcount==1
 
 
+def recover_stale_reply_sends(connection,*,now=None,minutes=SEND_CLAIM_MINUTES) -> int:
+    ensure_reply_schema(connection); current=now or datetime.now(timezone.utc); cutoff=(current-timedelta(minutes=minutes)).isoformat()
+    rows=connection.execute("SELECT message_id FROM employer_reply_drafts WHERE status='SENDING' AND (send_claimed_at IS NULL OR send_claimed_at<=?)",(cutoff,)).fetchall()
+    for row in rows:
+        message_id=str(row[0]); connection.execute("UPDATE employer_reply_drafts SET status='APPROVED',send_claimed_at=NULL,last_error='Recovered stale send claim' WHERE message_id=? AND status='SENDING'",(message_id,)); connection.commit(); record_reply_event(connection,message_id,'SEND_RECOVERED','Stale send claim released',now=current)
+    return len(rows)
+
+
 def claim_reply_send(connection,message_id: str,*,now=None) -> bool:
-    ensure_reply_schema(connection)
-    cursor=connection.execute("UPDATE employer_reply_drafts SET status='SENDING',last_error=NULL WHERE message_id=? AND status='APPROVED'",(message_id,)); connection.commit()
-    if cursor.rowcount==1: record_reply_event(connection,message_id,'SEND_CLAIMED',now=now)
+    ensure_reply_schema(connection); current=now or datetime.now(timezone.utc); recover_stale_reply_sends(connection,now=current)
+    cursor=connection.execute("UPDATE employer_reply_drafts SET status='SENDING',send_claimed_at=?,last_error=NULL WHERE message_id=? AND status='APPROVED'",(_stamp(current),message_id)); connection.commit()
+    if cursor.rowcount==1: record_reply_event(connection,message_id,'SEND_CLAIMED',now=current)
     return cursor.rowcount==1
 
 
 def mark_reply_sent(connection,message_id: str,*,now=None) -> None:
-    ensure_reply_schema(connection); stamp=_stamp(now); cursor=connection.execute("UPDATE employer_reply_drafts SET status='SENT',sent_at=?,last_error=NULL WHERE message_id=? AND status='SENDING'",(stamp,message_id)); connection.commit()
+    ensure_reply_schema(connection); stamp=_stamp(now); cursor=connection.execute("UPDATE employer_reply_drafts SET status='SENT',sent_at=?,send_claimed_at=NULL,last_error=NULL WHERE message_id=? AND status='SENDING'",(stamp,message_id)); connection.commit()
     if cursor.rowcount==1: record_reply_event(connection,message_id,'SENT',now=now)
 
 
 def mark_reply_send_failed(connection,message_id: str,error: str,*,now=None) -> None:
-    ensure_reply_schema(connection); detail=str(error)[:500]; cursor=connection.execute("UPDATE employer_reply_drafts SET status='APPROVED',last_error=? WHERE message_id=? AND status='SENDING'",(detail,message_id)); connection.commit()
+    ensure_reply_schema(connection); detail=str(error)[:500]; cursor=connection.execute("UPDATE employer_reply_drafts SET status='APPROVED',send_claimed_at=NULL,last_error=? WHERE message_id=? AND status='SENDING'",(detail,message_id)); connection.commit()
     if cursor.rowcount==1: record_reply_event(connection,message_id,'SEND_FAILED',detail,now=now)
