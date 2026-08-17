@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 
 from core.database import Database
+from core.employer_reply_store import apply_reply_retention
 from automation.email_transport import SMTPAlertSender
 from automation.gmail_auth import build_gmail_service
 from automation.gmail_source import GmailInboxSource
@@ -29,6 +30,7 @@ def build_alert_sender_from_environment():
 def run_inbox_runtime(messages, *, database=None, alert_sender=None):
     owns_database=database is None; database=database or Database()
     try:
+        apply_reply_retention(database.connection)
         results=process_inbox_messages(database.connection,[normalize_mail_message(message) for message in messages])
         if alert_sender is not None: notify_processed_responses(database.connection,results,alert_sender)
         return results
