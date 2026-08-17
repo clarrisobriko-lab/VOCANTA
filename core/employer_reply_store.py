@@ -13,8 +13,11 @@ def _stamp(now=None): return (now or datetime.now(timezone.utc)).isoformat()
 def ensure_reply_schema(connection) -> None:
     connection.execute("CREATE TABLE IF NOT EXISTS employer_reply_drafts(message_id TEXT PRIMARY KEY,job_id INTEGER NOT NULL,subject TEXT NOT NULL,body TEXT NOT NULL,status TEXT NOT NULL DEFAULT 'AWAITING_APPROVAL',created_at TEXT NOT NULL,approved_at TEXT,sent_at TEXT,last_error TEXT,send_claimed_at TEXT,gmail_sent_message_id TEXT,archived_at TEXT)")
     columns={r[1] for r in connection.execute("PRAGMA table_info(employer_reply_drafts)").fetchall()}
-    for name in ('approved_at','sent_at','last_error','send_claimed_at','gmail_sent_message_id','archived_at'):
-        if name not in columns: connection.execute(f"ALTER TABLE employer_reply_drafts ADD COLUMN {name} TEXT")
+    migrations=(('job_id','INTEGER'),('created_at','TEXT'),('approved_at','TEXT'),('sent_at','TEXT'),('last_error','TEXT'),('send_claimed_at','TEXT'),('gmail_sent_message_id','TEXT'),('archived_at','TEXT'))
+    for name,column_type in migrations:
+        if name not in columns:
+            connection.execute(f"ALTER TABLE employer_reply_drafts ADD COLUMN {name} {column_type}")
+            columns.add(name)
     connection.execute("CREATE TABLE IF NOT EXISTS employer_reply_audit(id INTEGER PRIMARY KEY AUTOINCREMENT,message_id TEXT NOT NULL,event TEXT NOT NULL,detail TEXT NOT NULL DEFAULT '',created_at TEXT NOT NULL)")
     connection.execute("CREATE INDEX IF NOT EXISTS idx_reply_status_archive_created ON employer_reply_drafts(status,archived_at,created_at DESC)")
     connection.execute("CREATE INDEX IF NOT EXISTS idx_reply_status_archive_sent ON employer_reply_drafts(status,archived_at,sent_at DESC)")
