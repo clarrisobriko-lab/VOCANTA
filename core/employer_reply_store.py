@@ -20,6 +20,7 @@ def ensure_reply_schema(connection) -> None:
             connection.execute(f"ALTER TABLE employer_reply_drafts ADD COLUMN {name} {column_type}")
             columns.add(name)
     connection.execute("CREATE TABLE IF NOT EXISTS employer_reply_audit(id INTEGER PRIMARY KEY AUTOINCREMENT,message_id TEXT NOT NULL,event TEXT NOT NULL,detail TEXT NOT NULL DEFAULT '',created_at TEXT NOT NULL)")
+    connection.execute("CREATE TABLE IF NOT EXISTS employer_reply_retention_runs(id INTEGER PRIMARY KEY AUTOINCREMENT,archived_replies INTEGER NOT NULL DEFAULT 0,audit_events INTEGER NOT NULL DEFAULT 0,created_at TEXT NOT NULL)")
     connection.execute("CREATE INDEX IF NOT EXISTS idx_reply_status_archive_created ON employer_reply_drafts(status,archived_at,created_at DESC)")
     connection.execute("CREATE INDEX IF NOT EXISTS idx_reply_status_archive_sent ON employer_reply_drafts(status,archived_at,sent_at DESC)")
     connection.execute("CREATE INDEX IF NOT EXISTS idx_reply_status_claim ON employer_reply_drafts(status,send_claimed_at)")
@@ -27,6 +28,7 @@ def ensure_reply_schema(connection) -> None:
     connection.execute("CREATE INDEX IF NOT EXISTS idx_reply_gmail_message ON employer_reply_drafts(gmail_sent_message_id)")
     connection.execute("CREATE INDEX IF NOT EXISTS idx_reply_audit_message_id ON employer_reply_audit(message_id,id DESC)")
     connection.execute("CREATE INDEX IF NOT EXISTS idx_reply_audit_created ON employer_reply_audit(created_at DESC)")
+    connection.execute("CREATE INDEX IF NOT EXISTS idx_reply_retention_created ON employer_reply_retention_runs(created_at DESC)")
     connection.commit()
 
 
@@ -37,7 +39,12 @@ def apply_reply_retention(connection,*,now=None,audit_days=REPLY_AUDIT_RETENTION
     if old_archived:
         placeholders=','.join('?' for _ in old_archived); connection.execute(f"DELETE FROM employer_reply_audit WHERE message_id IN ({placeholders})",old_archived); deleted_archives=connection.execute(f"DELETE FROM employer_reply_drafts WHERE message_id IN ({placeholders})",old_archived).rowcount
     deleted_audit=connection.execute("DELETE FROM employer_reply_audit WHERE created_at<? AND message_id NOT IN (SELECT message_id FROM employer_reply_drafts WHERE archived_at IS NOT NULL)",(audit_cutoff,)).rowcount
-    connection.commit(); return {'archived_replies':deleted_archives,'audit_events':deleted_audit}
+    result={'archived_replies':deleted_archives,'audit_events':deleted_audit}; connection.execute("INSERT INTO employer_reply_retention_runs(archived_replies,audit_events,created_at) VALUES(?,?,?)",(deleted_archives,deleted_audit,_stamp(current))); connection.commit(); return result
+
+
+def latest_reply_retention(connection):
+    ensure_reply_schema(connection); row=connection.execute("SELECT archived_replies,audit_events,created_at FROM employer_reply_retention_runs ORDER BY id DESC LIMIT 1").fetchone()
+    return {'archived_replies':int(row[0]),'audit_events':int(row[1]),'created_at':str(row[2])} if row else {'archived_replies':0,'audit_events':0,'created_at':''}
 
 
 def record_reply_event(connection,message_id: str,event: str,detail: str='',*,now=None) -> None:
