@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import os
-from statistics import mean, pstdev
 
 from config.settings import REPLY_RETENTION_ALERT_THRESHOLD
 from core.database import Database
@@ -30,7 +29,7 @@ def retention_alert_required(retention: dict,threshold=REPLY_RETENTION_ALERT_THR
 def retention_baseline(connection,limit=RETENTION_ANOMALY_BASELINE_RUNS):
     ensure_reply_schema(connection); rows=connection.execute("SELECT archived_replies+audit_events FROM employer_reply_retention_runs ORDER BY id DESC LIMIT ? OFFSET 1",(max(1,int(limit)),)).fetchall(); values=[int(row[0]) for row in rows]
     if not values: return {'runs':0,'mean':0.0,'deviation':0.0,'threshold':0.0}
-    average=mean(values); deviation=pstdev(values) if len(values)>1 else 0.0; threshold=average+RETENTION_ANOMALY_SIGMA*deviation
+    average=sum(values)/len(values); deviation=(sum((value-average)**2 for value in values)/len(values))**0.5 if len(values)>1 else 0.0; threshold=average+RETENTION_ANOMALY_SIGMA*deviation
     return {'runs':len(values),'mean':round(average,2),'deviation':round(deviation,2),'threshold':round(threshold,2)}
 def retention_anomaly(connection,retention,min_runs=RETENTION_ANOMALY_MIN_RUNS):
     baseline=retention_baseline(connection); volume=retention_volume(retention); required=max(2,int(min_runs)); anomalous=baseline['runs']>=required and volume>baseline['threshold'] and volume>baseline['mean']
