@@ -11,9 +11,9 @@ def _stamp(now=None): return (now or datetime.now(timezone.utc)).isoformat()
 
 
 def ensure_reply_schema(connection) -> None:
-    connection.execute("CREATE TABLE IF NOT EXISTS employer_reply_drafts(message_id TEXT PRIMARY KEY,job_id INTEGER NOT NULL,subject TEXT NOT NULL,body TEXT NOT NULL,status TEXT NOT NULL DEFAULT 'AWAITING_APPROVAL',created_at TEXT NOT NULL,approved_at TEXT,sent_at TEXT,last_error TEXT,send_claimed_at TEXT)")
+    connection.execute("CREATE TABLE IF NOT EXISTS employer_reply_drafts(message_id TEXT PRIMARY KEY,job_id INTEGER NOT NULL,subject TEXT NOT NULL,body TEXT NOT NULL,status TEXT NOT NULL DEFAULT 'AWAITING_APPROVAL',created_at TEXT NOT NULL,approved_at TEXT,sent_at TEXT,last_error TEXT,send_claimed_at TEXT,gmail_sent_message_id TEXT)")
     columns={r[1] for r in connection.execute("PRAGMA table_info(employer_reply_drafts)").fetchall()}
-    for name in ('approved_at','sent_at','last_error','send_claimed_at'):
+    for name in ('approved_at','sent_at','last_error','send_claimed_at','gmail_sent_message_id'):
         if name not in columns: connection.execute(f"ALTER TABLE employer_reply_drafts ADD COLUMN {name} TEXT")
     connection.execute("CREATE TABLE IF NOT EXISTS employer_reply_audit(id INTEGER PRIMARY KEY AUTOINCREMENT,message_id TEXT NOT NULL,event TEXT NOT NULL,detail TEXT NOT NULL DEFAULT '',created_at TEXT NOT NULL)")
     connection.commit()
@@ -58,9 +58,11 @@ def claim_reply_send(connection,message_id: str,*,now=None) -> bool:
     return cursor.rowcount==1
 
 
-def mark_reply_sent(connection,message_id: str,*,now=None) -> None:
-    ensure_reply_schema(connection); stamp=_stamp(now); cursor=connection.execute("UPDATE employer_reply_drafts SET status='SENT',sent_at=?,send_claimed_at=NULL,last_error=NULL WHERE message_id=? AND status='SENDING'",(stamp,message_id)); connection.commit()
-    if cursor.rowcount==1: record_reply_event(connection,message_id,'SENT',now=now)
+def mark_reply_sent(connection,message_id: str,gmail_message_id: str='',*,now=None) -> None:
+    ensure_reply_schema(connection); stamp=_stamp(now); gmail_message_id=str(gmail_message_id or '').strip(); cursor=connection.execute("UPDATE employer_reply_drafts SET status='SENT',sent_at=?,send_claimed_at=NULL,last_error=NULL,gmail_sent_message_id=? WHERE message_id=? AND status='SENDING'",(stamp,gmail_message_id,message_id)); connection.commit()
+    if cursor.rowcount==1:
+        if gmail_message_id: record_reply_event(connection,message_id,'GMAIL_ACCEPTED',gmail_message_id,now=now)
+        record_reply_event(connection,message_id,'SENT',gmail_message_id,now=now)
 
 
 def mark_reply_send_failed(connection,message_id: str,error: str,*,now=None) -> None:
