@@ -18,11 +18,11 @@ def send_approved_reply(connection,message_id: str,recipient: str | None,sender)
         mark_reply_send_failed(connection,message_id,'Missing recipient'); return False
     record_reply_event(connection,message_id,'SEND_ATTEMPT',target)
     try:
-        if context is not None: sender.send(target,str(row[0]),str(row[1]),thread_id=str(context[1]),in_reply_to=str(context[2]),references=str(context[3]))
-        else: sender.send(target,str(row[0]),str(row[1]))
+        if context is not None: gmail_message_id=sender.send(target,str(row[0]),str(row[1]),thread_id=str(context[1]),in_reply_to=str(context[2]),references=str(context[3]))
+        else: gmail_message_id=sender.send(target,str(row[0]),str(row[1]))
     except TypeError:
-        try: sender.send(target,str(row[0]),str(row[1]))
+        try: gmail_message_id=sender.send(target,str(row[0]),str(row[1]))
         except Exception as exc: mark_reply_send_failed(connection,message_id,str(exc)); return False
     except Exception as exc:
         mark_reply_send_failed(connection,message_id,str(exc)); return False
-    mark_reply_sent(connection,message_id); return True
+    mark_reply_sent(connection,message_id,str(gmail_message_id or '')); return True
