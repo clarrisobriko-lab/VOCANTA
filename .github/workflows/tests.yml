@@ -2,13 +2,17 @@ name: VOCANTA Tests
 
 on:
   push:
-    branches: [main]
   pull_request:
-    branches: [main]
   workflow_dispatch:
+  schedule:
+    - cron: '17 3 * * *'
 
 permissions:
   contents: read
+
+concurrency:
+  group: vocanta-tests-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   test:
@@ -21,6 +25,8 @@ jobs:
 
       - name: Show validation target
         run: |
+          echo "Event: $GITHUB_EVENT_NAME"
+          echo "Ref: $GITHUB_REF"
           echo "Validating commit: $GITHUB_SHA"
           git log -1 --oneline
 
