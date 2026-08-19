@@ -19,6 +19,11 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Show validation target
+        run: |
+          echo "Validating commit: $GITHUB_SHA"
+          git log -1 --oneline
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
