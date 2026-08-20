@@ -12,6 +12,7 @@ from automation.submission_evidence import build_submission_evidence, persist_su
 from automation.tailoring import TailoredDocuments, tailor_documents
 from automation.upload_hardening import validate_upload_path
 from core.models import Job
+from core.submission_audit import record_submission_evidence
 
 
 @dataclass(frozen=True, slots=True)
@@ -60,7 +61,7 @@ def _apply_with_recovery(job: Job, job_id: int, profile: ApplicantProfile, brows
     return last or AutomationResult("FAILED", "application retry budget exhausted", "", 0)
 
 
-def _persist_pipeline_evidence(job: Job, job_id: int, package: ApplicationPackage, automation: AutomationResult) -> Path:
+def _persist_pipeline_evidence(job: Job, job_id: int, package: ApplicationPackage, automation: AutomationResult, *, database=None, application_run_id: int | None = None) -> Path:
     evidence = build_submission_evidence(
         job,
         job_id,
@@ -70,10 +71,25 @@ def _persist_pipeline_evidence(job: Job, job_id: int, package: ApplicationPackag
         confirmation_url=getattr(automation, "active_url", "") or "",
         screenshot_path=getattr(automation, "screenshot_path", "") or "",
     )
-    return persist_submission_evidence(evidence, package.folder / "submission_evidence")
+    path = persist_submission_evidence(evidence, package.folder / "submission_evidence")
+    if database is not None:
+        connection = getattr(database, "connection", database)
+        record_submission_evidence(
+            connection,
+            job_id=job_id,
+            application_run_id=application_run_id,
+            evidence_path=path,
+            package_sha256=evidence.package_sha256,
+            ats=evidence.ats,
+            outcome=evidence.outcome,
+            confirmation_url=evidence.confirmation_url,
+            screenshot_path=evidence.screenshot_path,
+        )
+        connection.commit()
+    return path
 
 
-def run_application_pipeline(job: Job, job_id: int, profile: ApplicantProfile, *, scorer: Scorer | None = None, browser_engine_factory=HardenedBrowserApplicationEngine) -> PipelineResult:
+def run_application_pipeline(job: Job, job_id: int, profile: ApplicantProfile, *, scorer: Scorer | None = None, browser_engine_factory=HardenedBrowserApplicationEngine, database=None, application_run_id: int | None = None) -> PipelineResult:
     decision = (scorer or Scorer()).evaluate(job)
     if not decision.should_apply:
         return PipelineResult(decision, None, None, None, None)
@@ -82,5 +98,5 @@ def run_application_pipeline(job: Job, job_id: int, profile: ApplicantProfile, *
     browser_profile = profile_for_package(profile, package)
     validate_browser_documents(browser_profile)
     automation = _apply_with_recovery(job, job_id, browser_profile, browser_engine_factory)
-    evidence_path = _persist_pipeline_evidence(job, job_id, package, automation)
+    evidence_path = _persist_pipeline_evidence(job, job_id, package, automation, database=database, application_run_id=application_run_id)
     return PipelineResult(decision, documents, package, automation, evidence_path)
