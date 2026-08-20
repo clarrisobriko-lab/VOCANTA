@@ -1,4 +1,5 @@
 from dataclasses import dataclass, replace
+from pathlib import Path
 import time
 
 from agents.scorer import ApplicationDecision, Scorer
@@ -7,6 +8,7 @@ from automation.hardened_browser import HardenedBrowserApplicationEngine
 from automation.package_builder import ApplicationPackage, build_application_package
 from automation.profile import ApplicantProfile
 from automation.recovery import RecoveryAction, decide_recovery
+from automation.submission_evidence import build_submission_evidence, persist_submission_evidence
 from automation.tailoring import TailoredDocuments, tailor_documents
 from automation.upload_hardening import validate_upload_path
 from core.models import Job
@@ -18,6 +20,7 @@ class PipelineResult:
     documents: TailoredDocuments | None
     package: ApplicationPackage | None
     automation: AutomationResult | None
+    evidence_path: Path | None = None
 
 
 def profile_for_package(profile: ApplicantProfile, package: ApplicationPackage) -> ApplicantProfile:
@@ -57,12 +60,27 @@ def _apply_with_recovery(job: Job, job_id: int, profile: ApplicantProfile, brows
     return last or AutomationResult("FAILED", "application retry budget exhausted", "", 0)
 
 
+def _persist_pipeline_evidence(job: Job, job_id: int, package: ApplicationPackage, automation: AutomationResult) -> Path:
+    evidence = build_submission_evidence(
+        job,
+        job_id,
+        package,
+        outcome=automation.status,
+        message=automation.message,
+        confirmation_url=getattr(automation, "active_url", "") or "",
+        screenshot_path=getattr(automation, "screenshot_path", "") or "",
+    )
+    return persist_submission_evidence(evidence, package.folder / "submission_evidence")
+
+
 def run_application_pipeline(job: Job, job_id: int, profile: ApplicantProfile, *, scorer: Scorer | None = None, browser_engine_factory=HardenedBrowserApplicationEngine) -> PipelineResult:
     decision = (scorer or Scorer()).evaluate(job)
-    if not decision.should_apply: return PipelineResult(decision, None, None, None)
+    if not decision.should_apply:
+        return PipelineResult(decision, None, None, None, None)
     documents = tailor_documents(job, job_id, profile)
     package = build_application_package(job, documents, decision)
     browser_profile = profile_for_package(profile, package)
     validate_browser_documents(browser_profile)
     automation = _apply_with_recovery(job, job_id, browser_profile, browser_engine_factory)
-    return PipelineResult(decision, documents, package, automation)
+    evidence_path = _persist_pipeline_evidence(job, job_id, package, automation)
+    return PipelineResult(decision, documents, package, automation, evidence_path)
