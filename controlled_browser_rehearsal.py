@@ -4,6 +4,7 @@ from playwright.sync_api import sync_playwright
 
 from agents.scorer import Scorer
 from automation.application_pipeline import profile_for_package, validate_browser_documents
+from automation.ashby import fill_ashby_application
 from automation.ats import adapter_for_url
 from automation.forms import fill_application_form
 from automation.live_test_target import PERMITFLOW_ADMINISTRATIVE_ASSISTANT, authorize_target, canonical_url
@@ -55,7 +56,7 @@ def main() -> int:
                 authorize_target(page.url)
                 _wait_for_application_controls(page)
                 adapter = adapter_for_url(page.url)
-                result = fill_application_form(page, browser_profile, adapter.final_submit_texts)
+                result = fill_ashby_application(page, browser_profile, adapter.final_submit_texts) if adapter.name == "ASHBY" else fill_application_form(page, browser_profile, adapter.final_submit_texts)
                 page.wait_for_timeout(1000)
                 page.screenshot(path=str(screenshot), full_page=True)
                 print("CONTROLLED BROWSER REHEARSAL: COMPLETE")
