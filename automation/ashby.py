@@ -89,8 +89,7 @@ def _fill_by_question(page: Any, fragment: str, value: str) -> int:
         control = controls.nth(index)
         try:
             if not control.is_visible() or control.is_disabled() or control.input_value().strip(): continue
-            if fragment.lower() in _nearby_text(control).lower():
-                control.fill(str(value)); return 1
+            if fragment.lower() in _nearby_text(control).lower(): control.fill(str(value)); return 1
         except Exception: continue
     return 0
 
@@ -124,12 +123,9 @@ def _select_in_question(page: Any, question_fragment: str, answer: str) -> int:
     if best is None: return 0
     try:
         radio = best.get_by_role("radio", name=answer, exact=True).first
-        if radio.count():
-            radio.check(force=True)
-            if radio.is_checked(): return 1
+        if radio.count(): radio.check(force=True); return 1 if radio.is_checked() else 0
     except Exception: pass
-    try:
-        best.get_by_text(answer, exact=True).first.click(force=True); page.wait_for_timeout(150); return 1
+    try: best.get_by_text(answer, exact=True).first.click(force=True); page.wait_for_timeout(150); return 1
     except Exception: return 0
 
 
@@ -142,54 +138,37 @@ def _ashby_binary_answers(page: Any, profile: ApplicantProfile) -> int:
     return filled
 
 
-def _location_committed(control: Any, city: str, country: str) -> bool:
-    try:
-        value = normalize(control.input_value()).lower()
-    except Exception:
-        value = ""
-    if city and city in value and country and country in value: return True
-    if city and city in value: return True
-    try:
-        expanded = control.get_attribute("aria-expanded")
-        if expanded == "false" and value and value not in {country, f"{city}, {country}"}:
-            return True
-    except Exception: pass
-    return False
-
-
 def _ashby_location(page: Any, profile: ApplicantProfile) -> int:
-    desired = profile.current_location or f"{profile.city}, {profile.country}"
-    city = (profile.city or "").strip().lower()
-    country = (profile.country or "").strip().lower()
+    city = (profile.city or "").strip()
+    country = (profile.country or "").strip()
+    full_location = profile.current_location or f"{city}, {country}"
     controls = page.locator('[role="combobox"], input')
     for index in range(controls.count()):
         control = controls.nth(index)
         try:
             if not control.is_visible() or control.is_disabled(): continue
-            if "location" not in _nearby_text(control).lower(): continue
-            control.click(force=True); control.fill(""); control.fill(desired); page.wait_for_timeout(900)
+            question = _nearby_text(control).lower()
+            if "location" not in question and "country" not in question: continue
+            # Country-only selectors must receive the country, never a city/location string.
+            country_only = "country" in question or "select country" in question
+            desired = country if country_only else full_location
+            control.click(force=True); control.fill(""); control.fill(desired); page.wait_for_timeout(800)
             options = page.locator('[role="option"]:visible')
-            if not options.count(): continue
-            ranked: list[tuple[int, Any]] = []
+            chosen = None
             for oi in range(options.count()):
                 option = options.nth(oi)
-                text = normalize(option.inner_text(timeout=150)).lower()
-                score = 0
-                if city and city in text: score += 10
-                if country and country in text: score += 4
-                if text == f"{city}, {country}": score += 20
-                ranked.append((score, option))
-            ranked.sort(key=lambda item: item[0], reverse=True)
-            if not ranked or ranked[0][0] <= 0: continue
-            chosen = ranked[0][1]
-            chosen.scroll_into_view_if_needed()
-            chosen.click()
-            page.wait_for_timeout(500)
-            if _location_committed(control, city, country): return 1
-            control.press("ArrowDown"); control.press("Enter"); page.wait_for_timeout(500)
-            if _location_committed(control, city, country): return 1
-            control.fill(desired); page.wait_for_timeout(600); control.press("ArrowDown"); control.press("Enter"); page.wait_for_timeout(500)
-            if _location_committed(control, city, country): return 1
+                text = normalize(option.inner_text(timeout=150))
+                if country_only and text.lower() == country.lower(): chosen = option; break
+                if not country_only and city.lower() in text.lower() and country.lower() in text.lower(): chosen = option; break
+            if chosen is None and country_only:
+                for oi in range(options.count()):
+                    option = options.nth(oi); text = normalize(option.inner_text(timeout=150))
+                    if country.lower() in text.lower(): chosen = option; break
+            if chosen is None: continue
+            chosen.click(); page.wait_for_timeout(400)
+            value = normalize(control.input_value()).lower()
+            expected = country.lower() if country_only else city.lower()
+            if expected and expected in value: return 1
         except Exception: continue
     return 0
 
