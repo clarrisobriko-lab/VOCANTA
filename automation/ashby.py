@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from typing import Any
 
 from automation.forms import FillResult, FINAL_SUBMIT_TEXTS, fill_application_form, find_action_control, normalize
@@ -56,6 +57,12 @@ def _ashby_upload(page: Any, profile: ApplicantProfile) -> tuple[int, bool, bool
     return uploaded, cv, cover
 
 
+def _hourly_rate(profile: ApplicantProfile) -> str:
+    raw = str(profile.salary_expectation or "7")
+    numbers = re.findall(r"\d+(?:\.\d+)?", raw.replace(",", ""))
+    return numbers[-1] if numbers else "7"
+
+
 def _answer_for(label: str, profile: ApplicantProfile) -> str:
     label = normalize(label)
     if "introductory video" in label:
@@ -63,7 +70,7 @@ def _answer_for(label: str, profile: ApplicantProfile) -> str:
     if "how did you hear about this job opening" in label:
         return profile.standard_answers.get("how_did_you_hear", "LinkedIn")
     if "target hourly rate" in label:
-        return profile.salary_expectation or "7"
+        return _hourly_rate(profile)
     if "when are you looking to start" in label or "notice period" in label:
         return profile.notice_period
     if "linkedin profile" in label:
@@ -107,7 +114,6 @@ def _ashby_fill_text(page: Any, profile: ApplicantProfile) -> int:
     )
     for label, value in direct:
         filled += _fill_named(page, label, value)
-
     controls = page.locator('input:not([type="hidden"]):not([type="file"]):not([type="checkbox"]):not([type="radio"]), textarea')
     for index in range(controls.count()):
         control = controls.nth(index)
@@ -122,42 +128,11 @@ def _ashby_fill_text(page: Any, profile: ApplicantProfile) -> int:
     return filled
 
 
-def _select_yes_in_question(page: Any, question_fragment: str) -> int:
+def _select_in_question(page: Any, question_fragment: str, answer: str) -> int:
     candidates = page.locator("div").filter(has_text=question_fragment)
     best = None
     best_len = 10**9
-    for index in range(min(candidates.count(), 30)):
-        container = candidates.nth(index)
-        try:
-            text = normalize(container.inner_text(timeout=150))
-            if question_fragment.lower() not in text.lower() or len(text) >= best_len:
-                continue
-            yes = container.get_by_text("Yes", exact=True)
-            if yes.count():
-                best, best_len = container, len(text)
-        except Exception:
-            continue
-    if best is None:
-        return 0
-    try:
-        radio = best.get_by_role("radio", name="Yes", exact=True).first
-        if radio.count():
-            radio.check(force=True)
-            return 1
-    except Exception:
-        pass
-    try:
-        best.get_by_text("Yes", exact=True).first.click()
-        return 1
-    except Exception:
-        return 0
-
-
-def _select_radio_in_question(page: Any, question_fragment: str, answer: str) -> int:
-    candidates = page.locator("div").filter(has_text=question_fragment)
-    best = None
-    best_len = 10**9
-    for index in range(min(candidates.count(), 40)):
+    for index in range(min(candidates.count(), 50)):
         container = candidates.nth(index)
         try:
             text = normalize(container.inner_text(timeout=150))
@@ -173,24 +148,39 @@ def _select_radio_in_question(page: Any, question_fragment: str, answer: str) ->
         radio = best.get_by_role("radio", name=answer, exact=True).first
         if radio.count():
             radio.check(force=True)
-            return 1
+            if radio.is_checked():
+                return 1
     except Exception:
         pass
     try:
-        best.get_by_text(answer, exact=True).first.click()
-        return 1
+        target = best.get_by_text(answer, exact=True).first
+        target.click(force=True)
+        page.wait_for_timeout(100)
+        try:
+            radio = best.get_by_role("radio", name=answer, exact=True).first
+            if radio.count() and radio.is_checked():
+                return 1
+        except Exception:
+            pass
+        aria = target.get_attribute("aria-checked") or target.get_attribute("aria-pressed")
+        if aria == "true":
+            return 1
+        cls = (target.get_attribute("class") or "").lower()
+        if any(token in cls for token in ("selected", "checked", "active")):
+            return 1
     except Exception:
-        return 0
+        pass
+    return 0
 
 
 def _ashby_binary_answers(page: Any, profile: ApplicantProfile) -> int:
     filled = 0
-    filled += _select_yes_in_question(page, "available for full time work")
-    filled += _select_yes_in_question(page, "Monday through Friday")
+    filled += _select_in_question(page, "available for full time work", "Yes")
+    filled += _select_in_question(page, "Monday through Friday", "Yes")
     if profile.privacy_acknowledgements:
-        filled += _select_yes_in_question(page, "recruitment process includes questions")
-    filled += _select_radio_in_question(page, "gender", "Female")
-    filled += _select_radio_in_question(page, "race", "Black or African American (Not Hispanic or Latino)")
+        filled += _select_in_question(page, "recruitment process includes questions", "Yes")
+    filled += _select_in_question(page, "gender", "Female")
+    filled += _select_in_question(page, "race", "Black or African American (Not Hispanic or Latino)")
     return filled
 
 
