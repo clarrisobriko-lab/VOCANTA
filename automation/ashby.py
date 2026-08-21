@@ -144,40 +144,31 @@ def _ashby_binary_answers(page: Any, profile: ApplicantProfile) -> int:
 
 def _ashby_location(page: Any, profile: ApplicantProfile) -> int:
     desired = profile.current_location or f"{profile.city}, {profile.country}"
+    city = (profile.city or "").strip().lower()
+    country = (profile.country or "").strip().lower()
     controls = page.locator('[role="combobox"], input')
     for index in range(controls.count()):
         control = controls.nth(index)
         try:
             if not control.is_visible() or control.is_disabled(): continue
-            nearby = _nearby_text(control).lower()
-            if "location" not in nearby: continue
-            control.fill(""); control.fill(desired); page.wait_for_timeout(800)
+            if "location" not in _nearby_text(control).lower(): continue
+            control.fill(""); control.fill(desired); page.wait_for_timeout(900)
             options = page.locator('[role="option"]:visible')
             if not options.count(): continue
             chosen = None
-            city = (profile.city or "").lower()
-            country = (profile.country or "").lower()
             for oi in range(options.count()):
                 option = options.nth(oi)
                 text = normalize(option.inner_text(timeout=150)).lower()
                 if city and city in text:
                     chosen = option; break
-                if desired.lower() == text:
-                    chosen = option; break
             if chosen is None:
                 for oi in range(options.count()):
                     option = options.nth(oi)
                     text = normalize(option.inner_text(timeout=150)).lower()
-                    if country and text != country and country in text:
+                    if country and country in text:
                         chosen = option; break
             if chosen is None: continue
-            chosen.click(force=True); page.wait_for_timeout(300)
-            try:
-                current = control.input_value().strip().lower()
-                if city and city in current: return 1
-                if desired.lower() in current: return 1
-            except Exception:
-                return 1
+            chosen.click(force=True); page.wait_for_timeout(300); return 1
         except Exception: continue
     return 0
 
