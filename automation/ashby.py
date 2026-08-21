@@ -99,7 +99,6 @@ def _fill_named(page: Any, label: str, value: str) -> int:
 
 def _ashby_fill_text(page: Any, profile: ApplicantProfile) -> int:
     filled = 0
-    # Ashby exposes accessible labels. Fill critical fields directly before heuristic matching.
     direct = (
         ("Name", profile.full_name),
         ("How did you hear about this job opening?", profile.standard_answers.get("how_did_you_hear", "LinkedIn")),
@@ -124,7 +123,6 @@ def _ashby_fill_text(page: Any, profile: ApplicantProfile) -> int:
 
 
 def _select_yes_in_question(page: Any, question_fragment: str) -> int:
-    """Select Yes only inside the Ashby question containing question_fragment."""
     candidates = page.locator("div").filter(has_text=question_fragment)
     best = None
     best_len = 10**9
@@ -155,13 +153,45 @@ def _select_yes_in_question(page: Any, question_fragment: str) -> int:
         return 0
 
 
+def _select_radio_in_question(page: Any, question_fragment: str, answer: str) -> int:
+    """Select an explicitly approved radio answer inside one Ashby question."""
+    candidates = page.locator("div").filter(has_text=question_fragment)
+    best = None
+    best_len = 10**9
+    for index in range(min(candidates.count(), 40)):
+        container = candidates.nth(index)
+        try:
+            text = normalize(container.inner_text(timeout=150))
+            if question_fragment.lower() not in text.lower() or answer.lower() not in text.lower() or len(text) >= best_len:
+                continue
+            if container.get_by_text(answer, exact=True).count():
+                best, best_len = container, len(text)
+        except Exception:
+            continue
+    if best is None:
+        return 0
+    try:
+        radio = best.get_by_role("radio", name=answer, exact=True).first
+        if radio.count():
+            radio.check(force=True)
+            return 1
+    except Exception:
+        pass
+    try:
+        best.get_by_text(answer, exact=True).first.click()
+        return 1
+    except Exception:
+        return 0
+
+
 def _ashby_binary_answers(page: Any, profile: ApplicantProfile) -> int:
     filled = 0
-    # These are operational facts/acknowledgements, not demographic inferences.
     if profile.notice_period:
         filled += _select_yes_in_question(page, "available for full time work")
     if profile.privacy_acknowledgements:
         filled += _select_yes_in_question(page, "recruitment process includes questions")
+    # User explicitly approved Female as the persistent gender response. This does not enable race or other demographics.
+    filled += _select_radio_in_question(page, "gender", "Female")
     return filled
 
 
