@@ -142,6 +142,21 @@ def _ashby_binary_answers(page: Any, profile: ApplicantProfile) -> int:
     return filled
 
 
+def _location_committed(control: Any, city: str, country: str) -> bool:
+    try:
+        value = normalize(control.input_value()).lower()
+    except Exception:
+        value = ""
+    if city and city in value and country and country in value: return True
+    if city and city in value: return True
+    try:
+        expanded = control.get_attribute("aria-expanded")
+        if expanded == "false" and value and value not in {country, f"{city}, {country}"}:
+            return True
+    except Exception: pass
+    return False
+
+
 def _ashby_location(page: Any, profile: ApplicantProfile) -> int:
     desired = profile.current_location or f"{profile.city}, {profile.country}"
     city = (profile.city or "").strip().lower()
@@ -152,23 +167,29 @@ def _ashby_location(page: Any, profile: ApplicantProfile) -> int:
         try:
             if not control.is_visible() or control.is_disabled(): continue
             if "location" not in _nearby_text(control).lower(): continue
-            control.fill(""); control.fill(desired); page.wait_for_timeout(900)
+            control.click(force=True); control.fill(""); control.fill(desired); page.wait_for_timeout(900)
             options = page.locator('[role="option"]:visible')
             if not options.count(): continue
-            chosen = None
+            ranked: list[tuple[int, Any]] = []
             for oi in range(options.count()):
                 option = options.nth(oi)
                 text = normalize(option.inner_text(timeout=150)).lower()
-                if city and city in text:
-                    chosen = option; break
-            if chosen is None:
-                for oi in range(options.count()):
-                    option = options.nth(oi)
-                    text = normalize(option.inner_text(timeout=150)).lower()
-                    if country and country in text:
-                        chosen = option; break
-            if chosen is None: continue
-            chosen.click(force=True); page.wait_for_timeout(300); return 1
+                score = 0
+                if city and city in text: score += 10
+                if country and country in text: score += 4
+                if text == f"{city}, {country}": score += 20
+                ranked.append((score, option))
+            ranked.sort(key=lambda item: item[0], reverse=True)
+            if not ranked or ranked[0][0] <= 0: continue
+            chosen = ranked[0][1]
+            chosen.scroll_into_view_if_needed()
+            chosen.click()
+            page.wait_for_timeout(500)
+            if _location_committed(control, city, country): return 1
+            control.press("ArrowDown"); control.press("Enter"); page.wait_for_timeout(500)
+            if _location_committed(control, city, country): return 1
+            control.fill(desired); page.wait_for_timeout(600); control.press("ArrowDown"); control.press("Enter"); page.wait_for_timeout(500)
+            if _location_committed(control, city, country): return 1
         except Exception: continue
     return 0
 
