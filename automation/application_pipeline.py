@@ -33,13 +33,26 @@ def validate_browser_documents(profile: ApplicantProfile) -> None:
     required = (("CV", profile.resume_path), ("cover letter", profile.cover_letter_path))
     for label, path in required:
         valid, reason = validate_upload_path(path)
-        if not valid: raise RuntimeError(f"Invalid {label} upload: {reason}")
+        if not valid:
+            raise RuntimeError(f"Invalid {label} upload: {reason}")
     if profile.supporting_document_path:
         valid, reason = validate_upload_path(profile.supporting_document_path)
-        if not valid: raise RuntimeError(f"Invalid supporting document upload: {reason}")
+        if not valid:
+            raise RuntimeError(f"Invalid supporting document upload: {reason}")
+
+
+_CONFIRMED_STATUSES = {"SUBMITTED", "SUCCESS", "AUTO_SUBMITTED", "CONFIRMED"}
+_AMBIGUOUS_STATUSES = {"UNKNOWN", "SUBMISSION_UNVERIFIED"}
+_HUMAN_STATUSES = {"HUMAN_REQUIRED", "HUMAN_VERIFICATION", "MANUAL_REQUIRED", "READY_TO_REVIEW"}
+_TERMINAL_STATUSES = {"SKIPPED_SOURCE", "FAILED"}
 
 
 def _apply_with_recovery(job: Job, job_id: int, profile: ApplicantProfile, browser_engine_factory, *, max_attempts: int = 3, sleep_fn=time.sleep) -> AutomationResult:
+    """Apply with a bounded retry budget.
+
+    A result that indicates a submit click may already have occurred is never retried.
+    This prevents duplicate employer applications when confirmation evidence is absent.
+    """
     last: AutomationResult | None = None
     for attempt in range(1, max_attempts + 1):
         try:
@@ -47,9 +60,15 @@ def _apply_with_recovery(job: Job, job_id: int, profile: ApplicantProfile, brows
         except Exception as exc:
             decision = decide_recovery(str(exc), attempt, max_attempts)
         else:
-            if last.status in {"SUBMITTED", "SUCCESS"}:
+            status = (last.status or "").upper()
+            if status in _CONFIRMED_STATUSES:
+                return last
+            if status in _AMBIGUOUS_STATUSES:
+                return last
+            if status in _HUMAN_STATUSES or status == "SKIPPED_SOURCE":
                 return last
             decision = decide_recovery(f"{last.status} {last.message}", attempt, max_attempts)
+
         if decision.action == RecoveryAction.RETRY:
             sleep_fn(decision.delay_seconds)
             continue
@@ -62,14 +81,16 @@ def _apply_with_recovery(job: Job, job_id: int, profile: ApplicantProfile, brows
 
 
 def _persist_pipeline_evidence(job: Job, job_id: int, package: ApplicationPackage, automation: AutomationResult, *, database=None, application_run_id: int | None = None) -> Path:
+    confirmation_url = getattr(automation, "confirmation_url", "") or ""
+    screenshot_path = getattr(automation, "screenshot", "") or ""
     evidence = build_submission_evidence(
         job,
         job_id,
         package,
         outcome=automation.status,
         message=automation.message,
-        confirmation_url=getattr(automation, "active_url", "") or "",
-        screenshot_path=getattr(automation, "screenshot_path", "") or "",
+        confirmation_url=confirmation_url,
+        screenshot_path=screenshot_path,
     )
     path = persist_submission_evidence(evidence, package.folder / "submission_evidence")
     if database is not None:
