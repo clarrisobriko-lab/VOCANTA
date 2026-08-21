@@ -1,22 +1,76 @@
 {
-  "full_name": "Clarris Phegor Obriko",
   "first_name": "Clarris",
+  "middle_name": "Phegor",
   "last_name": "Obriko",
-  "employer_last_name": "Obriko",
   "email": "phegclarris@gmail.com",
   "phone": "",
   "city": "Abuja",
   "country": "Nigeria",
-  "current_location": "Abuja, Nigeria",
+  "address": "Abuja, Nigeria",
+  "postal_code": "",
   "linkedin_url": "",
   "website_url": "",
-  "resume_path": "data/Clarris_Obriko_CV.pdf",
-  "cover_letter_path": "",
+  "work_authorization": "No, I require employer sponsorship",
+  "requires_sponsorship": true,
   "notice_period": "Available immediately",
   "salary_expectation": "$7.00 per hour",
-  "privacy_acknowledgements": true,
+  "nationality": "Nigerian",
+  "region": "Africa",
+  "current_location": "Abuja, Nigeria",
+  "open_to_relocation": true,
+  "remote_preference": "Remote preferred",
+  "preferred_countries": ["United Kingdom", "Ireland", "Portugal", "Estonia", "Latvia", "Lithuania"],
+  "travel_commitment": "Yes",
+  "number_of_employers": "4",
+  "highest_education": {
+    "institution": "University of Uyo",
+    "degree": "Bachelor of Laws (LLB)",
+    "discipline": "Law",
+    "graduation_year": "2020",
+    "country": "Nigeria"
+  },
+  "employment_history": [
+    {
+      "title": "Human Resources Manager",
+      "employer": "Malachy Godian Enterprises",
+      "start_year": "2024",
+      "end_year": "",
+      "current": true,
+      "summary": "HR policy, onboarding, internal communications, scheduling, records management and staff training."
+    },
+    {
+      "title": "Legal Officer / Associate Counsel",
+      "employer": "Legal Defence and Assistance Project (LEDAP)",
+      "start_year": "2022",
+      "end_year": "2023",
+      "current": false,
+      "summary": "Legal representation and case support for indigent clients, pleadings and legal drafting, client interviews, defence strategy, NGO coordination and access to justice advocacy."
+    },
+    {
+      "title": "Legal Associate",
+      "employer": "Malcolm Omirhobo & Co.",
+      "start_year": "2021",
+      "end_year": "2022",
+      "current": false,
+      "summary": "Legal practice, research, drafting, client support and case coordination."
+    },
+    {
+      "title": "HR Personnel",
+      "employer": "Micura Services Ltd",
+      "start_year": "2019",
+      "end_year": "2021",
+      "current": false,
+      "summary": "Human resources administration, employee support, records and operational coordination."
+    }
+  ],
   "standard_answers": {
     "how_did_you_hear": "LinkedIn",
     "introductory_video_url": ""
-  }
+  },
+  "demographics": {},
+  "auto_fill_demographics": false,
+  "privacy_acknowledgements": true,
+  "resume_path": "data/Clarris_Obriko_CV.pdf",
+  "cover_letter_path": "",
+  "supporting_document_path": ""
 }
