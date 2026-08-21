@@ -12,39 +12,52 @@ def _text(locator: Any) -> str:
     for attr in ("aria-label", "placeholder", "name", "data-testid", "id"):
         try:
             value = locator.get_attribute(attr)
-            if value: parts.append(value)
-        except Exception: pass
+            if value:
+                parts.append(value)
+        except Exception:
+            pass
     for depth in range(1, 6):
         try:
             value = normalize(locator.locator(f"xpath=ancestor::div[{depth}]").inner_text(timeout=250))
-            if value and len(value) <= 700: parts.append(value)
-        except Exception: pass
+            if value and len(value) <= 700:
+                parts.append(value)
+        except Exception:
+            pass
     return normalize(" ".join(parts))
 
 
 def _nearby_text(control: Any) -> str:
-    candidates = []
+    candidates: list[str] = []
     for depth in range(1, 7):
         try:
             text = normalize(control.locator(f"xpath=ancestor::div[{depth}]").inner_text(timeout=200))
-            if text and len(text) <= 900: candidates.append(text)
-        except Exception: pass
+            if text and len(text) <= 900:
+                candidates.append(text)
+        except Exception:
+            pass
     return min(candidates, key=len) if candidates else _text(control)
 
 
 def _ashby_upload(page: Any, profile: ApplicantProfile) -> tuple[int, bool, bool]:
-    uploaded = 0; cv = cover = False
+    uploaded = 0
+    cv = cover = False
     files = page.locator('input[type="file"]')
     for index in range(files.count()):
         control = files.nth(index)
         try:
             label = _text(control)
-            if control.input_value(): continue
+            if control.input_value():
+                continue
             if "cover letter" in label and profile.cover_letter_path:
-                control.set_input_files(profile.cover_letter_path); uploaded += 1; cover = True
+                control.set_input_files(profile.cover_letter_path)
+                uploaded += 1
+                cover = True
             elif not cv and profile.resume_path:
-                control.set_input_files(profile.resume_path); uploaded += 1; cv = True
-        except Exception: continue
+                control.set_input_files(profile.resume_path)
+                uploaded += 1
+                cv = True
+        except Exception:
+            continue
     return uploaded, cv, cover
 
 
@@ -58,28 +71,44 @@ def _hourly_rate(profile: ApplicantProfile) -> str:
 
 def _answer_for(label: str, profile: ApplicantProfile) -> str:
     label = normalize(label)
-    if "introductory video" in label: return profile.standard_answers.get("introductory_video_url", "")
-    if "how did you hear about this job opening" in label: return profile.standard_answers.get("how_did_you_hear", "LinkedIn")
-    if "target hourly rate" in label: return _hourly_rate(profile)
-    if "when are you looking to start" in label or "notice period" in label: return profile.notice_period
-    if "linkedin profile" in label: return profile.linkedin_url
-    if label.startswith("name") and "email" not in label: return profile.full_name
-    if "first name" in label: return profile.first_name
-    if "last name" in label: return profile.employer_last_name
-    if label.startswith("email"): return profile.email
-    if label.startswith("phone"): return profile.phone
-    if "website" in label: return profile.website_url
+    if "introductory video" in label:
+        return profile.standard_answers.get("introductory_video_url", "")
+    if "how did you hear about this job opening" in label:
+        return profile.standard_answers.get("how_did_you_hear", "LinkedIn")
+    if "target hourly rate" in label:
+        return _hourly_rate(profile)
+    if "when are you looking to start" in label or "notice period" in label:
+        return profile.notice_period
+    if "linkedin profile" in label:
+        return profile.linkedin_url
+    if label.startswith("name") and "email" not in label:
+        return profile.full_name
+    if "first name" in label:
+        return profile.first_name
+    if "last name" in label:
+        return profile.employer_last_name
+    if label.startswith("email"):
+        return profile.email
+    if label.startswith("phone"):
+        return profile.phone
+    if "website" in label:
+        return profile.website_url
     return ""
 
 
 def _fill_named(page: Any, label: str, value: str) -> int:
-    if not value: return 0
+    if not value:
+        return 0
     for exact in (True, False):
         try:
             control = page.get_by_label(label, exact=exact).first
-            if control.count() and control.is_visible() and not control.is_disabled() and not control.input_value().strip():
-                control.fill(str(value)); return 1
-        except Exception: pass
+            if control.count() and control.is_visible() and not control.is_disabled():
+                current = control.input_value().strip()
+                if current != str(value):
+                    control.fill(str(value))
+                return 1
+        except Exception:
+            pass
     return 0
 
 
@@ -88,119 +117,162 @@ def _fill_by_question(page: Any, fragment: str, value: str) -> int:
     for index in range(controls.count()):
         control = controls.nth(index)
         try:
-            if not control.is_visible() or control.is_disabled() or control.input_value().strip(): continue
-            if fragment.lower() in _nearby_text(control).lower(): control.fill(str(value)); return 1
-        except Exception: continue
+            if not control.is_visible() or control.is_disabled():
+                continue
+            if fragment.lower() not in _nearby_text(control).lower():
+                continue
+            if control.input_value().strip() != str(value):
+                control.fill(str(value))
+            return 1
+        except Exception:
+            continue
     return 0
 
 
 def _ashby_fill_text(page: Any, profile: ApplicantProfile) -> int:
     filled = 0
-    for label, value in (("Name", profile.full_name), ("How did you hear about this job opening?", profile.standard_answers.get("how_did_you_hear", "LinkedIn")), ("When are you looking to start?", profile.notice_period), ("LinkedIn Profile", profile.linkedin_url)):
+    direct = (
+        ("Name", profile.full_name),
+        ("How did you hear about this job opening?", profile.standard_answers.get("how_did_you_hear", "LinkedIn")),
+        ("When are you looking to start?", profile.notice_period),
+        ("LinkedIn Profile", profile.linkedin_url),
+    )
+    for label, value in direct:
         filled += _fill_named(page, label, value)
     filled += _fill_by_question(page, "target hourly rate", _hourly_rate(profile))
     controls = page.locator('input:not([type="hidden"]):not([type="file"]):not([type="checkbox"]):not([type="radio"]), textarea')
     for index in range(controls.count()):
         control = controls.nth(index)
         try:
-            if not control.is_visible() or control.is_disabled() or control.input_value().strip(): continue
+            if not control.is_visible() or control.is_disabled() or control.input_value().strip():
+                continue
             value = _answer_for(_nearby_text(control), profile)
-            if value: control.fill(str(value)); filled += 1
-        except Exception: continue
+            if value:
+                control.fill(str(value))
+                filled += 1
+        except Exception:
+            continue
     return filled
 
 
 def _select_in_question(page: Any, question_fragment: str, answer: str) -> int:
     candidates = page.locator("div").filter(has_text=question_fragment)
-    best = None; best_len = 10**9
+    best = None
+    best_len = 10**9
     for index in range(min(candidates.count(), 50)):
         container = candidates.nth(index)
         try:
             text = normalize(container.inner_text(timeout=150))
-            if question_fragment.lower() not in text.lower() or answer.lower() not in text.lower() or len(text) >= best_len: continue
-            if container.get_by_text(answer, exact=True).count(): best, best_len = container, len(text)
-        except Exception: continue
-    if best is None: return 0
+            if question_fragment.lower() not in text.lower() or answer.lower() not in text.lower() or len(text) >= best_len:
+                continue
+            if container.get_by_text(answer, exact=True).count():
+                best, best_len = container, len(text)
+        except Exception:
+            continue
+    if best is None:
+        return 0
     try:
         radio = best.get_by_role("radio", name=answer, exact=True).first
-        if radio.count(): radio.check(force=True); return 1 if radio.is_checked() else 0
-    except Exception: pass
-    try: best.get_by_text(answer, exact=True).first.click(force=True); page.wait_for_timeout(150); return 1
-    except Exception: return 0
+        if radio.count():
+            radio.check(force=True)
+            return 1 if radio.is_checked() else 0
+    except Exception:
+        pass
+    try:
+        best.get_by_text(answer, exact=True).first.click(force=True)
+        page.wait_for_timeout(150)
+        return 1
+    except Exception:
+        return 0
 
 
 def _ashby_binary_answers(page: Any, profile: ApplicantProfile) -> int:
     filled = _select_in_question(page, "available for full time work", "Yes")
     filled += _select_in_question(page, "willingness to adhere to this schedule", "Yes")
-    if profile.privacy_acknowledgements: filled += _select_in_question(page, "recruitment process includes questions", "Yes")
+    if profile.privacy_acknowledgements:
+        filled += _select_in_question(page, "recruitment process includes questions", "Yes")
     filled += _select_in_question(page, "gender", "Female")
     filled += _select_in_question(page, "race", "Black or African American (Not Hispanic or Latino)")
     return filled
 
 
 def _ashby_location(page: Any, profile: ApplicantProfile) -> int:
-    city = (profile.city or "").strip()
-    country = (profile.country or "").strip()
-    full_location = profile.current_location or f"{city}, {country}"
+    country = (profile.country or "Nigeria").strip()
     controls = page.locator('[role="combobox"], input')
     for index in range(controls.count()):
         control = controls.nth(index)
         try:
-            if not control.is_visible() or control.is_disabled(): continue
+            if not control.is_visible() or control.is_disabled():
+                continue
             question = _nearby_text(control).lower()
-            if "location" not in question and "country" not in question: continue
-            # Country-only selectors must receive the country, never a city/location string.
-            country_only = "country" in question or "select country" in question
-            desired = country if country_only else full_location
-            control.click(force=True); control.fill(""); control.fill(desired); page.wait_for_timeout(800)
+            if "location" not in question and "country" not in question:
+                continue
+            control.click(force=True)
+            control.fill("")
+            control.fill(country)
+            page.wait_for_timeout(800)
             options = page.locator('[role="option"]:visible')
             chosen = None
             for oi in range(options.count()):
                 option = options.nth(oi)
                 text = normalize(option.inner_text(timeout=150))
-                if country_only and text.lower() == country.lower(): chosen = option; break
-                if not country_only and city.lower() in text.lower() and country.lower() in text.lower(): chosen = option; break
-            if chosen is None and country_only:
+                if text.lower() == country.lower():
+                    chosen = option
+                    break
+            if chosen is None:
                 for oi in range(options.count()):
-                    option = options.nth(oi); text = normalize(option.inner_text(timeout=150))
-                    if country.lower() in text.lower(): chosen = option; break
-            if chosen is None: continue
-            chosen.click(); page.wait_for_timeout(400)
-            value = normalize(control.input_value()).lower()
-            expected = country.lower() if country_only else city.lower()
-            if expected and expected in value: return 1
-        except Exception: continue
+                    option = options.nth(oi)
+                    text = normalize(option.inner_text(timeout=150))
+                    if country.lower() in text.lower():
+                        chosen = option
+                        break
+            if chosen is None:
+                continue
+            chosen.click(force=True)
+            page.wait_for_timeout(350)
+            if country.lower() in normalize(control.input_value()).lower():
+                return 1
+        except Exception:
+            continue
     return 0
 
 
 def _manual_requirements(page: Any, profile: ApplicantProfile) -> list[str]:
     body = normalize(page.locator("body").inner_text(timeout=2000))
-    if "3 to 5 minute introductory video" in body and not profile.standard_answers.get("introductory_video_url", "").strip(): return ["Introductory video link, 3 to 5 minutes, publicly viewable"]
+    if "3 to 5 minute introductory video" in body and not profile.standard_answers.get("introductory_video_url", "").strip():
+        return ["Introductory video link, 3 to 5 minutes, publicly viewable"]
     return []
 
 
-def _clean_required(items: list[str]) -> list[str]:
-    cleaned = []
-    for item in items:
-        value = normalize(item)
-        if not value or value == "type here" or "systemfield_name" in value: continue
-        if value not in cleaned: cleaned.append(value)
-    return cleaned
-
-
-def _required_unanswered(page: Any, existing: list[str], profile: ApplicantProfile) -> list[str]:
-    unresolved = _clean_required(existing)
-    controls = page.locator('input:not([type="hidden"]):not([type="file"]), textarea')
+def _required_unanswered(page: Any, profile: ApplicantProfile) -> list[str]:
+    unresolved: list[str] = []
+    controls = page.locator('input:not([type="hidden"]):not([type="file"]), textarea, select')
     for index in range(controls.count()):
         control = controls.nth(index)
         try:
-            if not control.is_visible() or control.is_disabled() or control.input_value().strip(): continue
+            if not control.is_visible() or control.is_disabled():
+                continue
             label = _nearby_text(control)
             required = control.get_attribute("required") is not None or control.get_attribute("aria-required") == "true" or "*" in label
-            if required and label and len(label) <= 500 and label not in unresolved: unresolved.append(label)
-        except Exception: continue
+            if not required:
+                continue
+            value = ""
+            try:
+                value = control.input_value().strip()
+            except Exception:
+                pass
+            if value:
+                continue
+            candidate = normalize(label)
+            if not candidate or candidate == "type here" or "systemfield_name" in candidate:
+                continue
+            if candidate not in unresolved:
+                unresolved.append(candidate)
+        except Exception:
+            continue
     for requirement in _manual_requirements(page, profile):
-        if requirement not in unresolved: unresolved.append(requirement)
+        if requirement not in unresolved:
+            unresolved.append(requirement)
     return unresolved
 
 
@@ -210,5 +282,18 @@ def fill_ashby_application(page: Any, profile: ApplicantProfile, final_submit_te
     upload_count, cv, cover = _ashby_upload(page, profile)
     detected = page.locator('input, textarea, select, [role="combobox"]').count()
     submit = find_action_control(page, final_submit_texts, exact=True)
-    unresolved = _required_unanswered(page, generic.required_unanswered, profile)
-    return FillResult(filled=generic.filled + extra_filled + upload_count, required_unanswered=unresolved, safe_submit_found=submit is not None, next_step_found=generic.next_step_found, action_audit=generic.action_audit, restricted_questions=generic.restricted_questions, fields_detected=max(generic.fields_detected, detected), required_fields=max(generic.required_fields, len(unresolved)), optional_skipped=generic.optional_skipped, cv_uploaded=generic.cv_uploaded or cv, cover_letter_uploaded=generic.cover_letter_uploaded or cover, field_audit=generic.field_audit)
+    unresolved = _required_unanswered(page, profile)
+    return FillResult(
+        filled=generic.filled + extra_filled + upload_count,
+        required_unanswered=unresolved,
+        safe_submit_found=submit is not None,
+        next_step_found=generic.next_step_found,
+        action_audit=generic.action_audit,
+        restricted_questions=generic.restricted_questions,
+        fields_detected=max(generic.fields_detected, detected),
+        required_fields=max(generic.required_fields, len(unresolved)),
+        optional_skipped=generic.optional_skipped,
+        cv_uploaded=generic.cv_uploaded or cv,
+        cover_letter_uploaded=generic.cover_letter_uploaded or cover,
+        field_audit=generic.field_audit,
+    )
