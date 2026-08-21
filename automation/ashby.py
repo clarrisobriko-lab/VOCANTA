@@ -46,22 +46,19 @@ def _ashby_upload(page: Any, profile: ApplicantProfile) -> tuple[int, bool, bool
         control = files.nth(index)
         try:
             label = _text(control)
-            if control.input_value():
-                continue
+            if control.input_value(): continue
             if "cover letter" in label and profile.cover_letter_path:
                 control.set_input_files(profile.cover_letter_path); uploaded += 1; cover = True
             elif not cv and profile.resume_path:
                 control.set_input_files(profile.resume_path); uploaded += 1; cv = True
-        except Exception:
-            continue
+        except Exception: continue
     return uploaded, cv, cover
 
 
 def _hourly_rate(profile: ApplicantProfile) -> str:
     raw = str(profile.salary_expectation or "7")
     numbers = re.findall(r"\d+(?:\.\d+)?", raw.replace(",", ""))
-    if not numbers:
-        return "7"
+    if not numbers: return "7"
     values = [float(x) for x in numbers]
     valid = [x for x in values if 3.5 <= x <= 7.0]
     value = max(valid) if valid else 7.0
@@ -70,41 +67,28 @@ def _hourly_rate(profile: ApplicantProfile) -> str:
 
 def _answer_for(label: str, profile: ApplicantProfile) -> str:
     label = normalize(label)
-    if "introductory video" in label:
-        return profile.standard_answers.get("introductory_video_url", "")
-    if "how did you hear about this job opening" in label:
-        return profile.standard_answers.get("how_did_you_hear", "LinkedIn")
-    if "target hourly rate" in label:
-        return _hourly_rate(profile)
-    if "when are you looking to start" in label or "notice period" in label:
-        return profile.notice_period
-    if "linkedin profile" in label:
-        return profile.linkedin_url
-    if label.startswith("name") and "email" not in label:
-        return profile.full_name
-    if "first name" in label:
-        return profile.first_name
-    if "last name" in label:
-        return profile.employer_last_name
-    if label.startswith("email"):
-        return profile.email
-    if label.startswith("phone"):
-        return profile.phone
-    if "website" in label:
-        return profile.website_url
+    if "introductory video" in label: return profile.standard_answers.get("introductory_video_url", "")
+    if "how did you hear about this job opening" in label: return profile.standard_answers.get("how_did_you_hear", "LinkedIn")
+    if "target hourly rate" in label: return _hourly_rate(profile)
+    if "when are you looking to start" in label or "notice period" in label: return profile.notice_period
+    if "linkedin profile" in label: return profile.linkedin_url
+    if label.startswith("name") and "email" not in label: return profile.full_name
+    if "first name" in label: return profile.first_name
+    if "last name" in label: return profile.employer_last_name
+    if label.startswith("email"): return profile.email
+    if label.startswith("phone"): return profile.phone
+    if "website" in label: return profile.website_url
     return ""
 
 
 def _fill_named(page: Any, label: str, value: str) -> int:
-    if not value:
-        return 0
+    if not value: return 0
     for exact in (True, False):
         try:
             control = page.get_by_label(label, exact=exact).first
             if control.count() and control.is_visible() and not control.is_disabled() and not control.input_value().strip():
                 control.fill(str(value)); return 1
-        except Exception:
-            pass
+        except Exception: pass
     return 0
 
 
@@ -113,20 +97,16 @@ def _fill_by_question(page: Any, fragment: str, value: str) -> int:
     for index in range(controls.count()):
         control = controls.nth(index)
         try:
-            if not control.is_visible() or control.is_disabled() or control.input_value().strip():
-                continue
-            if fragment.lower() in _nearby_text(control).lower():
-                control.fill(str(value)); return 1
-        except Exception:
-            continue
+            if not control.is_visible() or control.is_disabled() or control.input_value().strip(): continue
+            if fragment.lower() in _nearby_text(control).lower(): control.fill(str(value)); return 1
+        except Exception: continue
     return 0
 
 
 def _ashby_fill_text(page: Any, profile: ApplicantProfile) -> int:
     filled = 0
     direct = (("Name", profile.full_name), ("How did you hear about this job opening?", profile.standard_answers.get("how_did_you_hear", "LinkedIn")), ("When are you looking to start?", profile.notice_period), ("LinkedIn Profile", profile.linkedin_url))
-    for label, value in direct:
-        filled += _fill_named(page, label, value)
+    for label, value in direct: filled += _fill_named(page, label, value)
     filled += _fill_by_question(page, "target hourly rate", _hourly_rate(profile))
     controls = page.locator('input:not([type="hidden"]):not([type="file"]):not([type="checkbox"]):not([type="radio"]), textarea')
     for index in range(controls.count()):
@@ -178,15 +158,27 @@ def _ashby_location(page: Any, profile: ApplicantProfile) -> int:
         try:
             if not control.is_visible() or control.is_disabled(): continue
             if "location" not in _nearby_text(control).lower(): continue
-            current = control.input_value().strip()
-            if current and current.lower() != desired.lower(): control.fill("")
-            if not control.input_value().strip(): control.fill(desired)
-            page.wait_for_timeout(600)
+            control.fill("")
+            control.fill(desired)
+            page.wait_for_timeout(700)
             options = page.locator('[role="option"]:visible')
-            if options.count():
-                exact = options.filter(has_text=desired)
-                target = exact.first if exact.count() else options.first
-                target.click(force=True); page.wait_for_timeout(200); return 1
+            chosen = False
+            for oi in range(options.count()):
+                option = options.nth(oi)
+                text = normalize(option.inner_text(timeout=150))
+                if desired.lower() in text.lower() or (profile.city and profile.city.lower() in text.lower()):
+                    option.click(force=True); chosen = True; break
+            if not chosen:
+                try:
+                    page.keyboard.press("ArrowDown")
+                    page.keyboard.press("Enter")
+                    chosen = True
+                except Exception: pass
+            page.wait_for_timeout(250)
+            if chosen:
+                try:
+                    if page.locator('[role="option"]:visible').count() == 0: return 1
+                except Exception: return 1
         except Exception: continue
     return 0
 
