@@ -1,0 +1,22 @@
+{
+  "full_name": "Clarris Phegor Obriko",
+  "first_name": "Clarris",
+  "last_name": "Obriko",
+  "employer_last_name": "Obriko",
+  "email": "phegclarris@gmail.com",
+  "phone": "",
+  "city": "Port Harcourt",
+  "country": "Nigeria",
+  "current_location": "Port Harcourt, Nigeria",
+  "linkedin_url": "",
+  "website_url": "",
+  "resume_path": "data/Clarris_Obriko_CV.pdf",
+  "cover_letter_path": "",
+  "notice_period": "Available immediately",
+  "salary_expectation": "$7.00 per hour",
+  "privacy_acknowledgements": true,
+  "standard_answers": {
+    "how_did_you_hear": "LinkedIn",
+    "introductory_video_url": ""
+  }
+}
