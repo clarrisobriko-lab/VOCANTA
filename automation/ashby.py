@@ -26,7 +26,6 @@ def _text(locator: Any) -> str:
 
 
 def _nearby_text(control: Any) -> str:
-    """Return the smallest useful Ashby question container for a control."""
     candidates: list[str] = []
     for depth in range(1, 7):
         try:
@@ -59,6 +58,8 @@ def _ashby_upload(page: Any, profile: ApplicantProfile) -> tuple[int, bool, bool
 
 def _answer_for(label: str, profile: ApplicantProfile) -> str:
     label = normalize(label)
+    if "introductory video" in label:
+        return profile.standard_answers.get("introductory_video_url", "")
     if "how did you hear about this job opening" in label:
         return profile.standard_answers.get("how_did_you_hear", "LinkedIn")
     if "target hourly rate" in label:
@@ -82,8 +83,32 @@ def _answer_for(label: str, profile: ApplicantProfile) -> str:
     return ""
 
 
+def _fill_named(page: Any, label: str, value: str) -> int:
+    if not value:
+        return 0
+    for exact in (True, False):
+        try:
+            control = page.get_by_label(label, exact=exact).first
+            if control.count() and control.is_visible() and not control.is_disabled() and not control.input_value().strip():
+                control.fill(str(value))
+                return 1
+        except Exception:
+            pass
+    return 0
+
+
 def _ashby_fill_text(page: Any, profile: ApplicantProfile) -> int:
     filled = 0
+    # Ashby exposes accessible labels. Fill critical fields directly before heuristic matching.
+    direct = (
+        ("Name", profile.full_name),
+        ("How did you hear about this job opening?", profile.standard_answers.get("how_did_you_hear", "LinkedIn")),
+        ("When are you looking to start?", profile.notice_period),
+        ("LinkedIn Profile", profile.linkedin_url),
+    )
+    for label, value in direct:
+        filled += _fill_named(page, label, value)
+
     controls = page.locator('input:not([type="hidden"]):not([type="file"]):not([type="checkbox"]):not([type="radio"]), textarea')
     for index in range(controls.count()):
         control = controls.nth(index)
@@ -95,6 +120,48 @@ def _ashby_fill_text(page: Any, profile: ApplicantProfile) -> int:
                 control.fill(str(value)); filled += 1
         except Exception:
             continue
+    return filled
+
+
+def _select_yes_in_question(page: Any, question_fragment: str) -> int:
+    """Select Yes only inside the Ashby question containing question_fragment."""
+    candidates = page.locator("div").filter(has_text=question_fragment)
+    best = None
+    best_len = 10**9
+    for index in range(min(candidates.count(), 30)):
+        container = candidates.nth(index)
+        try:
+            text = normalize(container.inner_text(timeout=150))
+            if question_fragment.lower() not in text.lower() or len(text) >= best_len:
+                continue
+            yes = container.get_by_text("Yes", exact=True)
+            if yes.count():
+                best, best_len = container, len(text)
+        except Exception:
+            continue
+    if best is None:
+        return 0
+    try:
+        radio = best.get_by_role("radio", name="Yes", exact=True).first
+        if radio.count():
+            radio.check(force=True)
+            return 1
+    except Exception:
+        pass
+    try:
+        best.get_by_text("Yes", exact=True).first.click()
+        return 1
+    except Exception:
+        return 0
+
+
+def _ashby_binary_answers(page: Any, profile: ApplicantProfile) -> int:
+    filled = 0
+    # These are operational facts/acknowledgements, not demographic inferences.
+    if profile.notice_period:
+        filled += _select_yes_in_question(page, "available for full time work")
+    if profile.privacy_acknowledgements:
+        filled += _select_yes_in_question(page, "recruitment process includes questions")
     return filled
 
 
@@ -117,9 +184,11 @@ def _ashby_location(page: Any, profile: ApplicantProfile) -> int:
     return 0
 
 
-def _manual_requirements(page: Any) -> list[str]:
+def _manual_requirements(page: Any, profile: ApplicantProfile) -> list[str]:
     body = normalize(page.locator("body").inner_text(timeout=2000))
-    return ["Introductory video link, 3 to 5 minutes, publicly viewable"] if "3 to 5 minute introductory video" in body else []
+    if "3 to 5 minute introductory video" in body and not profile.standard_answers.get("introductory_video_url", "").strip():
+        return ["Introductory video link, 3 to 5 minutes, publicly viewable"]
+    return []
 
 
 def _clean_required(items: list[str]) -> list[str]:
@@ -133,7 +202,7 @@ def _clean_required(items: list[str]) -> list[str]:
     return cleaned
 
 
-def _required_unanswered(page: Any, existing: list[str]) -> list[str]:
+def _required_unanswered(page: Any, existing: list[str], profile: ApplicantProfile) -> list[str]:
     unresolved = _clean_required(existing)
     controls = page.locator('input:not([type="hidden"]):not([type="file"]), textarea')
     for index in range(controls.count()):
@@ -147,7 +216,7 @@ def _required_unanswered(page: Any, existing: list[str]) -> list[str]:
                 unresolved.append(label)
         except Exception:
             continue
-    for requirement in _manual_requirements(page):
+    for requirement in _manual_requirements(page, profile):
         if requirement not in unresolved:
             unresolved.append(requirement)
     return unresolved
@@ -155,11 +224,11 @@ def _required_unanswered(page: Any, existing: list[str]) -> list[str]:
 
 def fill_ashby_application(page: Any, profile: ApplicantProfile, final_submit_texts: tuple[str, ...] = FINAL_SUBMIT_TEXTS) -> FillResult:
     generic = fill_application_form(page, profile, final_submit_texts)
-    extra_filled = _ashby_fill_text(page, profile) + _ashby_location(page, profile)
+    extra_filled = _ashby_fill_text(page, profile) + _ashby_binary_answers(page, profile) + _ashby_location(page, profile)
     upload_count, cv, cover = _ashby_upload(page, profile)
     detected = page.locator('input, textarea, select, [role="combobox"]').count()
     submit = find_action_control(page, final_submit_texts, exact=True)
-    unresolved = _required_unanswered(page, generic.required_unanswered)
+    unresolved = _required_unanswered(page, generic.required_unanswered, profile)
     return FillResult(filled=generic.filled + extra_filled + upload_count, required_unanswered=unresolved,
         safe_submit_found=submit is not None, next_step_found=generic.next_step_found,
         action_audit=generic.action_audit, restricted_questions=generic.restricted_questions,
