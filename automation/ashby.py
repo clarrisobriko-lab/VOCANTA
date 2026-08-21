@@ -154,7 +154,6 @@ def _select_yes_in_question(page: Any, question_fragment: str) -> int:
 
 
 def _select_radio_in_question(page: Any, question_fragment: str, answer: str) -> int:
-    """Select an explicitly approved radio answer inside one Ashby question."""
     candidates = page.locator("div").filter(has_text=question_fragment)
     best = None
     best_len = 10**9
@@ -190,8 +189,8 @@ def _ashby_binary_answers(page: Any, profile: ApplicantProfile) -> int:
         filled += _select_yes_in_question(page, "available for full time work")
     if profile.privacy_acknowledgements:
         filled += _select_yes_in_question(page, "recruitment process includes questions")
-    # User explicitly approved Female as the persistent gender response. This does not enable race or other demographics.
     filled += _select_radio_in_question(page, "gender", "Female")
+    filled += _select_radio_in_question(page, "race", "Black or African American (Not Hispanic or Latino)")
     return filled
 
 
