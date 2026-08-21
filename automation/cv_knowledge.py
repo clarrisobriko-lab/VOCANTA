@@ -19,7 +19,7 @@ def _norm(value: str) -> str:
 
 
 def _tokens(value: str) -> set[str]:
-    stop = {"the","and","for","with","your","you","our","this","that","are","was","have","has","job","role","work","experience","relevant","describe","tell","about","please"}
+    stop = {"the","and","for","with","your","you","our","this","that","are","was","have","has","job","role","work","experience","relevant","describe","tell","about","please","candidate","position","will","from","their","they","who","what","how"}
     return {word for word in re.findall(r"[a-zA-Z]{3,}", (value or "").lower()) if word not in stop}
 
 
@@ -31,14 +31,17 @@ def _record_text(record: EmploymentRecord) -> str:
     return row
 
 
-def _ranked_employment(question: str, records: Iterable[EmploymentRecord]) -> list[EmploymentRecord]:
-    query = _tokens(question)
+def _ranked_employment(question: str, records: Iterable[EmploymentRecord], job_context: str = "") -> list[EmploymentRecord]:
+    question_tokens = _tokens(question)
+    job_tokens = _tokens(job_context)
     scored = []
     for position, record in enumerate(records):
         haystack = _tokens(f"{record.title} {record.employer} {record.summary}")
-        overlap = len(query & haystack)
+        question_overlap = len(question_tokens & haystack)
+        vacancy_overlap = len(job_tokens & haystack)
         current_bonus = 0.25 if record.current else 0.0
-        scored.append((overlap + current_bonus, -position, record))
+        score = (question_overlap * 2.0) + vacancy_overlap + current_bonus
+        scored.append((score, -position, record))
     scored.sort(key=lambda item: (item[0], item[1]), reverse=True)
     return [item[2] for item in scored]
 
@@ -48,8 +51,13 @@ def _employment_text(records: Iterable[EmploymentRecord], limit: int = 1800) -> 
     return " ".join(part for part in parts if part)[:limit]
 
 
-def answer_from_cv(question: str, profile: ApplicantProfile) -> GroundedAnswer | None:
-    """Answer only from approved structured CV/profile facts, never invention."""
+def answer_from_cv(question: str, profile: ApplicantProfile, job_context: str = "") -> GroundedAnswer | None:
+    """Answer only from approved CV/profile facts.
+
+    For experience questions, rank evidence against both the employer's question
+    and vacancy context. Job text influences ordering only and can never become
+    an applicant fact.
+    """
     q = _norm(question).lower()
     education = profile.highest_education
     employment = profile.employment_history
@@ -66,9 +74,11 @@ def answer_from_cv(question: str, profile: ApplicantProfile) -> GroundedAnswer |
         current = next((item for item in employment if item.current), None)
         if current and current.employer: return GroundedAnswer(_norm(current.employer), "cv.employment.current.employer", 1.0)
     if any(key in q for key in ("employment history", "work history", "professional experience", "relevant experience", "tell us about your experience", "background", "skills and experience")):
-        ranked = _ranked_employment(question, employment)
+        ranked = _ranked_employment(question, employment, job_context)
         value = _employment_text(ranked)
-        if value: return GroundedAnswer(value, "cv.employment.relevance_ranked", 0.95)
+        if value:
+            source = "cv.employment.question_and_vacancy_ranked" if job_context else "cv.employment.relevance_ranked"
+            return GroundedAnswer(value, source, 0.95)
     if "number of employers" in q and profile.number_of_employers:
         return GroundedAnswer(_norm(profile.number_of_employers), "cv.employment.count", 1.0)
     if any(key in q for key in ("nationality", "citizenship")) and profile.nationality:
