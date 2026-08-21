@@ -15,6 +15,16 @@ from core.database import Database
 from core.models import Job
 
 
+def _wait_for_application_controls(page) -> None:
+    page.wait_for_load_state("domcontentloaded")
+    try:
+        page.wait_for_load_state("networkidle", timeout=15000)
+    except Exception:
+        pass
+    page.locator('input, textarea, select, [role="combobox"]').first.wait_for(state="attached", timeout=30000)
+    page.wait_for_timeout(1500)
+
+
 def main() -> int:
     target = PERMITFLOW_ADMINISTRATIVE_ASSISTANT
     authorize_target(target.application_url)
@@ -43,15 +53,24 @@ def main() -> int:
             try:
                 page.goto(target.application_url, wait_until="domcontentloaded", timeout=60000)
                 authorize_target(page.url)
+                _wait_for_application_controls(page)
                 adapter = adapter_for_url(page.url)
                 result = fill_application_form(page, browser_profile, adapter.final_submit_texts)
+                page.wait_for_timeout(1000)
                 page.screenshot(path=str(screenshot), full_page=True)
                 print("CONTROLLED BROWSER REHEARSAL: COMPLETE")
                 print(f"Target: {target.employer} | {target.title}")
                 print(f"ATS: {adapter.name}")
+                print(f"Fields detected: {result.fields_detected}")
                 print(f"Fields filled: {result.filled}")
+                print(f"CV uploaded: {result.cv_uploaded}")
+                print(f"Cover letter uploaded: {result.cover_letter_uploaded}")
                 print(f"Required unanswered: {len(result.required_unanswered)}")
+                for field in result.required_unanswered:
+                    print(f"  REQUIRED: {field}")
                 print(f"Restricted questions: {len(result.restricted_questions)}")
+                for question in result.restricted_questions:
+                    print(f"  RESTRICTED: {question}")
                 print(f"Final submit detected: {result.safe_submit_found}")
                 print(f"Screenshot: {screenshot}")
                 print("SUBMISSION: DISABLED. Final submit was not clicked.")
