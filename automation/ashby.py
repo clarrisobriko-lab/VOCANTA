@@ -63,7 +63,7 @@ def _answer_for(label: str, profile: ApplicantProfile) -> str:
     if "how did you hear about this job opening" in label:
         return profile.standard_answers.get("how_did_you_hear", "LinkedIn")
     if "target hourly rate" in label:
-        return profile.salary_expectation
+        return profile.salary_expectation or "7"
     if "when are you looking to start" in label or "notice period" in label:
         return profile.notice_period
     if "linkedin profile" in label:
@@ -185,8 +185,8 @@ def _select_radio_in_question(page: Any, question_fragment: str, answer: str) ->
 
 def _ashby_binary_answers(page: Any, profile: ApplicantProfile) -> int:
     filled = 0
-    if profile.notice_period:
-        filled += _select_yes_in_question(page, "available for full time work")
+    filled += _select_yes_in_question(page, "available for full time work")
+    filled += _select_yes_in_question(page, "Monday through Friday")
     if profile.privacy_acknowledgements:
         filled += _select_yes_in_question(page, "recruitment process includes questions")
     filled += _select_radio_in_question(page, "gender", "Female")
