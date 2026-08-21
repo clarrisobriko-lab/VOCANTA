@@ -12,35 +12,28 @@ def _text(locator: Any) -> str:
     for attr in ("aria-label", "placeholder", "name", "data-testid", "id"):
         try:
             value = locator.get_attribute(attr)
-            if value:
-                parts.append(value)
-        except Exception:
-            pass
+            if value: parts.append(value)
+        except Exception: pass
     for depth in range(1, 6):
         try:
             value = normalize(locator.locator(f"xpath=ancestor::div[{depth}]").inner_text(timeout=250))
-            if value and len(value) <= 700:
-                parts.append(value)
-        except Exception:
-            pass
+            if value and len(value) <= 700: parts.append(value)
+        except Exception: pass
     return normalize(" ".join(parts))
 
 
 def _nearby_text(control: Any) -> str:
-    candidates: list[str] = []
+    candidates = []
     for depth in range(1, 7):
         try:
             text = normalize(control.locator(f"xpath=ancestor::div[{depth}]").inner_text(timeout=200))
-            if text and len(text) <= 900:
-                candidates.append(text)
-        except Exception:
-            pass
+            if text and len(text) <= 900: candidates.append(text)
+        except Exception: pass
     return min(candidates, key=len) if candidates else _text(control)
 
 
 def _ashby_upload(page: Any, profile: ApplicantProfile) -> tuple[int, bool, bool]:
-    uploaded = 0
-    cv = cover = False
+    uploaded = 0; cv = cover = False
     files = page.locator('input[type="file"]')
     for index in range(files.count()):
         control = files.nth(index)
@@ -57,9 +50,7 @@ def _ashby_upload(page: Any, profile: ApplicantProfile) -> tuple[int, bool, bool
 
 def _hourly_rate(profile: ApplicantProfile) -> str:
     raw = str(profile.salary_expectation or "7")
-    numbers = re.findall(r"\d+(?:\.\d+)?", raw.replace(",", ""))
-    if not numbers: return "7"
-    values = [float(x) for x in numbers]
+    values = [float(x) for x in re.findall(r"\d+(?:\.\d+)?", raw.replace(",", ""))]
     valid = [x for x in values if 3.5 <= x <= 7.0]
     value = max(valid) if valid else 7.0
     return str(int(value)) if value.is_integer() else str(value)
@@ -98,15 +89,16 @@ def _fill_by_question(page: Any, fragment: str, value: str) -> int:
         control = controls.nth(index)
         try:
             if not control.is_visible() or control.is_disabled() or control.input_value().strip(): continue
-            if fragment.lower() in _nearby_text(control).lower(): control.fill(str(value)); return 1
+            if fragment.lower() in _nearby_text(control).lower():
+                control.fill(str(value)); return 1
         except Exception: continue
     return 0
 
 
 def _ashby_fill_text(page: Any, profile: ApplicantProfile) -> int:
     filled = 0
-    direct = (("Name", profile.full_name), ("How did you hear about this job opening?", profile.standard_answers.get("how_did_you_hear", "LinkedIn")), ("When are you looking to start?", profile.notice_period), ("LinkedIn Profile", profile.linkedin_url))
-    for label, value in direct: filled += _fill_named(page, label, value)
+    for label, value in (("Name", profile.full_name), ("How did you hear about this job opening?", profile.standard_answers.get("how_did_you_hear", "LinkedIn")), ("When are you looking to start?", profile.notice_period), ("LinkedIn Profile", profile.linkedin_url)):
+        filled += _fill_named(page, label, value)
     filled += _fill_by_question(page, "target hourly rate", _hourly_rate(profile))
     controls = page.locator('input:not([type="hidden"]):not([type="file"]):not([type="checkbox"]):not([type="radio"]), textarea')
     for index in range(controls.count()):
@@ -137,13 +129,13 @@ def _select_in_question(page: Any, question_fragment: str, answer: str) -> int:
             if radio.is_checked(): return 1
     except Exception: pass
     try:
-        best.get_by_text(answer, exact=True).first.click(force=True); page.wait_for_timeout(100); return 1
+        best.get_by_text(answer, exact=True).first.click(force=True); page.wait_for_timeout(150); return 1
     except Exception: return 0
 
 
 def _ashby_binary_answers(page: Any, profile: ApplicantProfile) -> int:
     filled = _select_in_question(page, "available for full time work", "Yes")
-    filled += _select_in_question(page, "Monday through Friday", "Yes")
+    filled += _select_in_question(page, "willingness to adhere to this schedule", "Yes")
     if profile.privacy_acknowledgements: filled += _select_in_question(page, "recruitment process includes questions", "Yes")
     filled += _select_in_question(page, "gender", "Female")
     filled += _select_in_question(page, "race", "Black or African American (Not Hispanic or Latino)")
@@ -157,28 +149,35 @@ def _ashby_location(page: Any, profile: ApplicantProfile) -> int:
         control = controls.nth(index)
         try:
             if not control.is_visible() or control.is_disabled(): continue
-            if "location" not in _nearby_text(control).lower(): continue
-            control.fill("")
-            control.fill(desired)
-            page.wait_for_timeout(700)
+            nearby = _nearby_text(control).lower()
+            if "location" not in nearby: continue
+            control.fill(""); control.fill(desired); page.wait_for_timeout(800)
             options = page.locator('[role="option"]:visible')
-            chosen = False
+            if not options.count(): continue
+            chosen = None
+            city = (profile.city or "").lower()
+            country = (profile.country or "").lower()
             for oi in range(options.count()):
                 option = options.nth(oi)
-                text = normalize(option.inner_text(timeout=150))
-                if desired.lower() in text.lower() or (profile.city and profile.city.lower() in text.lower()):
-                    option.click(force=True); chosen = True; break
-            if not chosen:
-                try:
-                    page.keyboard.press("ArrowDown")
-                    page.keyboard.press("Enter")
-                    chosen = True
-                except Exception: pass
-            page.wait_for_timeout(250)
-            if chosen:
-                try:
-                    if page.locator('[role="option"]:visible').count() == 0: return 1
-                except Exception: return 1
+                text = normalize(option.inner_text(timeout=150)).lower()
+                if city and city in text:
+                    chosen = option; break
+                if desired.lower() == text:
+                    chosen = option; break
+            if chosen is None:
+                for oi in range(options.count()):
+                    option = options.nth(oi)
+                    text = normalize(option.inner_text(timeout=150)).lower()
+                    if country and text != country and country in text:
+                        chosen = option; break
+            if chosen is None: continue
+            chosen.click(force=True); page.wait_for_timeout(300)
+            try:
+                current = control.input_value().strip().lower()
+                if city and city in current: return 1
+                if desired.lower() in current: return 1
+            except Exception:
+                return 1
         except Exception: continue
     return 0
 
