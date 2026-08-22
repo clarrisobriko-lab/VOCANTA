@@ -20,6 +20,27 @@ def normalize_text(value: str | None) -> str:
     return " ".join((value or "").lower().split())
 
 
+def sanitize_applicant_text(value: str | None) -> str:
+    """Remove typographic dashes from applicant facing generated prose.
+
+    VOCANTA deliberately avoids em and en dashes in CVs, cover letters and
+    application answers. A spaced dash is treated as a clause separator and
+    becomes a comma. Remaining dash characters are replaced with spaces so
+    date ranges and compounds remain readable without introducing forbidden
+    punctuation.
+    """
+    text = value or ""
+    text = re.sub(r"\s*[\u2013\u2014]\s*", ", ", text)
+    text = re.sub(r"\s*-\s*", " ", text)
+    text = re.sub(r"\s+,\s*", ", ", text)
+    text = re.sub(r",\s*,+", ",", text)
+    return re.sub(r"[ \t]{2,}", " ", text).strip()
+
+
+def has_forbidden_dashes(value: str | None) -> bool:
+    return any(character in (value or "") for character in ("\u2013", "\u2014"))
+
+
 def _pattern(term: str) -> re.Pattern[str]:
     normalized = normalize_text(term)
     return re.compile(rf"(?<!\w){re.escape(normalized)}(?!\w)", re.IGNORECASE)
