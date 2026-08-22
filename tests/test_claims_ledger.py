@@ -4,7 +4,7 @@ from core.models import Job
 
 
 def job(description: str) -> Job:
-    return Job(company="Example", title="Operations Role", description=description, url="https://example.com/job", source="test")
+    return Job(company="Example", title="Operations Role", location="Remote", description=description, url="https://example.com/job", source="test")
 
 
 def test_every_verified_skill_has_evidence():
