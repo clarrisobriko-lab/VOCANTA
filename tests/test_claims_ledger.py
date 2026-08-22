@@ -27,10 +27,12 @@ def test_unsupported_vacancy_requirement_stays_missing():
     assert "workday" not in verified_job_keywords(job("Workday required"))
 
 
-def test_unverified_collaboration_tools_remain_gaps():
+def test_applicant_verified_collaboration_tools_are_supported():
     result = analyse_ats_match(job("Daily collaboration through Slack and Zoom is required."))
-    assert "slack" in result.missing_skills
-    assert "zoom" in result.missing_skills
+    assert "slack" in result.matched_skills
+    assert "zoom" in result.matched_skills
+    assert "slack" not in result.missing_skills
+    assert "zoom" not in result.missing_skills
 
 
 def test_inferred_project_and_workflow_claims_remain_gaps():
