@@ -5,7 +5,7 @@ from automation.preflight import assess_application_url
 from connectors.registry import get_connectors
 
 
-EXPECTED_CONNECTORS = ["Greenhouse", "Lever", "Ashby", "SmartRecruiters", "Workday", "HiddenRoles", "UnlistedRemote", "InclusivelyRemote", "RemoteRocketship", "Remotive", "WorkingNomads", "Jobspresso"]
+EXPECTED_CONNECTORS = ["Greenhouse", "Lever", "Ashby", "SmartRecruiters", "Workday", "HiddenRoles", "UnlistedRemote", "InclusivelyRemote", "RemoteRocketship", "Remotive", "WorkingNomads", "Jobspresso", "TaskFavour"]
 
 
 class AshbyProductionTests(unittest.TestCase):
