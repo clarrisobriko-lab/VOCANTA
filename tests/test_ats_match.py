@@ -29,14 +29,16 @@ class ATSMatchTests(unittest.TestCase):
         self.assertIn("salesforce", result.missing_skills)
         self.assertLess(result.score, 100)
 
-    def test_unverified_remote_tools_are_reported_as_gaps(self):
+    def test_verified_remote_tools_are_not_false_gaps(self):
         job = Job(
             "Example", "Executive Assistant", "Remote", "test", "https://example.com",
             description="Coordinate meetings using Zoom and collaborate through Slack",
         )
         result = analyse_ats_match(job)
-        self.assertIn("zoom", result.missing_skills)
-        self.assertIn("slack", result.missing_skills)
+        self.assertIn("zoom", result.matched_skills)
+        self.assertIn("slack", result.matched_skills)
+        self.assertNotIn("zoom", result.missing_skills)
+        self.assertNotIn("slack", result.missing_skills)
 
     def test_no_detected_requirements_is_neutral_not_failure(self):
         job = Job("Example", "Coordinator", "Remote", "test", "https://example.com", description="Support the team")
