@@ -3,13 +3,13 @@ import logging
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from playwright.sync_api import Frame, Locator, Page
+    from playwright.sync_api import Page
 else:
-    Frame = Locator = Page = Any
+    Page = Any
 
 from automation.profile import ApplicantProfile
-from automation.cv_knowledge import answer_from_cv
-from automation.questions import Intent, identify_intent, normalize, resolve_question, restriction_reason
+from automation.questions import Intent, identify_intent, normalize, resolve_question
+from automation.semantic_answers import answer_application_question
 from automation.diagnostics import FieldAudit
 
 logger = logging.getLogger(__name__)
@@ -29,12 +29,10 @@ class FillResult:
     cover_letter_uploaded: bool = False
     field_audit: tuple[FieldAudit, ...] = ()
 
-FIELD_ALIASES = {"first_name":("first name","firstname","given name","given-name"),"middle_name":("middle name","middlename","middle initial","additional name"),"last_name":("last name","lastname","surname","family name","family-name"),"full_name":("full name","your name","candidate name"),"email":("email","email address","e-mail"),"phone":("phone","phone number","mobile","telephone","contact number"),"city":("city","current city","location city"),"country":("country","current country","country of residence"),"address":("address","street address","home address"),"postal_code":("postal code","postcode","zip code","zip"),"linkedin_url":("linkedin","linkedin profile","linkedin url"),"website_url":("website","portfolio","personal website"),"notice_period":("notice period","availability","when can you start"),"salary_expectation":("salary expectation","expected salary","desired salary","compensation expectation")}
 FINAL_SUBMIT_TEXTS=("submit application","send application","complete application","finish application","confirm and submit","submit")
 NEXT_STEP_TEXTS=("continue","next","save and continue","proceed","review application","review and submit")
 NEGATIVE_BUTTON_TEXTS=("cancel","back","close","delete","withdraw","save job")
 
-def normalize(value:str|None)->str: return " ".join((value or "").lower().split())
 def profile_value(profile,field,*,has_middle_name_field):
     if field=="full_name": return profile.full_name
     if field=="last_name" and not has_middle_name_field: return profile.employer_last_name
@@ -56,7 +54,7 @@ def _label_for(locator):
     for attribute in ("aria-label","placeholder","name","autocomplete","data-qa","data-testid","id"):
         value=locator.get_attribute(attribute)
         if value:return value
-    try:return locator.locator("xpath=..").inner_text()[:500]
+    try:return locator.locator("xpath=..").inner_text()[:900]
     except Exception:return ""
 def _has_middle_name_field(frame):
     controls=frame.locator('input:not([type="hidden"]):not([type="file"]):not([type="submit"]), textarea')
@@ -73,7 +71,7 @@ def _fill_text_inputs(frame,profile,job_context=""):
             if not control.is_visible() or control.is_disabled() or control.input_value().strip():continue
             label=_label_for(control); field=identify_field(label); value=profile_value(profile,field,has_middle_name_field=has_middle) if field else ""; source=f"profile.{field}" if field else ""
             if not value:
-                grounded=answer_from_cv(label,profile,job_context=job_context)
+                grounded=answer_application_question(label,profile,job_context=job_context)
                 if grounded:value=grounded.value;source=grounded.source
             if not value:continue
             control.fill(value);filled+=1;logger.info("Grounded field fill | label=%r | source=%s",label[:180],source)
@@ -90,30 +88,30 @@ def _upload_documents(frame,profile):
         except Exception:continue
     return uploaded
 def _select_by_visible_text(select,preferred):
+    if not preferred:return False
     for label in (preferred,preferred.lower(),preferred.upper()):
         try:select.select_option(label=label);return True
         except Exception:continue
-    options=select.locator("option")
+    options=select.locator("option"); target=normalize(preferred)
     for i in range(options.count()):
         option=options.nth(i)
         try:
             text=normalize(option.inner_text())
-            if normalize(preferred) in text or text in normalize(preferred):
+            if target==text or target in text or (text and text in target):
                 value=option.get_attribute("value")
                 if value is not None:select.select_option(value=value);return True
         except Exception:continue
     return False
-def _select_common_options(frame,profile):
+def _select_common_options(frame,profile,job_context=""):
     filled=0;selects=frame.locator("select")
     for i in range(selects.count()):
         s=selects.nth(i)
         try:
-            if not s.is_visible() or s.is_disabled():continue
-            label=normalize(_label_for(s));success=False
-            if "country" in label:success=_select_by_visible_text(s,profile.country)
-            elif "sponsor" in label or "visa" in label:success=_select_by_visible_text(s,"Yes" if profile.requires_sponsorship else "No")
-            elif "work authorization" in label or "authorisation" in label:success=_select_by_visible_text(s,profile.work_authorization)
-            if success:filled+=1
+            if not s.is_visible() or s.is_disabled() or s.input_value():continue
+            label=_label_for(s); resolution=resolve_question(label,profile); preferred=resolution.value if resolution.auto_fill_allowed else ""
+            if not preferred:
+                grounded=answer_application_question(label,profile,job_context=job_context);preferred=grounded.value if grounded else ""
+            if preferred and _select_by_visible_text(s,preferred):filled+=1
         except Exception:continue
     return filled
 def _required_unanswered(frame):
@@ -169,8 +167,8 @@ def click_next_step(page):
     if not result:return False
     _,c=result;c.scroll_into_view_if_needed();c.click();return True
 def _is_required(c):return bool(c.get_attribute("required") is not None or normalize(c.get_attribute("aria-required"))=="true")
-def _choose_radio_or_checkbox(frame,profile):
-    filled=0;audits=[];restricted=[];groups=set();controls=frame.locator('input[type="radio"], input[type="checkbox"]')
+def _choose_radio_or_checkbox(frame,profile,job_context=""):
+    filled=0;audits=[];groups=set();controls=frame.locator('input[type="radio"], input[type="checkbox"]')
     for i in range(controls.count()):
         c=controls.nth(i)
         try:
@@ -179,22 +177,22 @@ def _choose_radio_or_checkbox(frame,profile):
             if name in groups:continue
             groups.add(name);label=_label_for(c);group=frame.locator(f'input[name="{name}"]') if not name.startswith('__single_') else c;combined=label
             if group.count()>1:
-                try:combined=group.first.locator("xpath=../..").inner_text()[:500]
+                try:combined=group.first.locator("xpath=../..").inner_text()[:900]
                 except Exception:pass
-            restriction=restriction_reason(combined)
-            if restriction:restricted.append(combined.strip()[:220]);audits.append(FieldAudit(combined[:180],identify_intent(combined).value,_is_required(c),"blocked",restriction));continue
-            resolution=resolve_question(combined,profile)
-            if not resolution.value:continue
-            desired=normalize(resolution.value);chosen=None
+            resolution=resolve_question(combined,profile);desired=normalize(resolution.value if resolution.auto_fill_allowed else "")
+            if not desired:
+                grounded=answer_application_question(combined,profile,job_context=job_context);desired=normalize(grounded.value if grounded else "")
+            if not desired:continue
+            chosen=None
             for oi in range(group.count()):
                 option=group.nth(oi);option_label=normalize(_label_for(option));option_value=normalize(option.get_attribute("value"))
                 if desired==option_label or desired==option_value or desired in option_label:chosen=option;break
-            if chosen is not None:chosen.check(force=True);filled+=1;audits.append(FieldAudit(combined[:180],identify_intent(combined).value,_is_required(c),"filled",resolution.source))
+            if chosen is not None:chosen.check(force=True);filled+=1;audits.append(FieldAudit(combined[:180],identify_intent(combined).value,_is_required(c),"filled","grounded semantic answer"))
         except Exception:continue
-    return filled,audits,restricted
+    return filled,audits
 def fill_application_form(page:Page,profile:ApplicantProfile,final_submit_texts:tuple[str,...]=FINAL_SUBMIT_TEXTS,*,job_context:str="")->FillResult:
-    filled=0;unanswered=[];audits=[];restricted=[];detected=0;required=0
+    filled=0;unanswered=[];audits=[];detected=0;required=0
     for frame in form_frames(page):
-        detected+=frame.locator('input, textarea, select').count();required+=frame.locator('[required], [aria-required="true"]').count();filled+=_fill_text_inputs(frame,profile,job_context);filled+=_upload_documents(frame,profile);filled+=_select_common_options(frame,profile);rf,ra,rr=_choose_radio_or_checkbox(frame,profile);filled+=rf;audits.extend(ra);restricted.extend(rr);unanswered.extend(_required_unanswered(frame))
+        detected+=frame.locator('input, textarea, select').count();required+=frame.locator('[required], [aria-required="true"]').count();filled+=_fill_text_inputs(frame,profile,job_context);filled+=_upload_documents(frame,profile);filled+=_select_common_options(frame,profile,job_context);rf,ra=_choose_radio_or_checkbox(frame,profile,job_context);filled+=rf;audits.extend(ra);unanswered.extend(_required_unanswered(frame))
     submit=find_action_control(page,final_submit_texts,exact=True);next_step=find_action_control(page,NEXT_STEP_TEXTS)
-    return FillResult(filled,tuple(dict.fromkeys(unanswered)),submit is not None,next_step is not None,audit_action_controls(page,final_submit_texts,exact=True),tuple(dict.fromkeys(restricted)),detected,required,field_audit=tuple(audits))
+    return FillResult(filled,tuple(dict.fromkeys(unanswered)),submit is not None,next_step is not None,audit_action_controls(page,final_submit_texts,exact=True),(),detected,required,field_audit=tuple(audits))
