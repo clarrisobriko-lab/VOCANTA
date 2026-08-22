@@ -27,6 +27,18 @@ def test_unsupported_vacancy_requirement_stays_missing():
     assert "workday" not in verified_job_keywords(job("Workday required"))
 
 
+def test_unverified_collaboration_tools_remain_gaps():
+    result = analyse_ats_match(job("Daily collaboration through Slack and Zoom is required."))
+    assert "slack" in result.missing_skills
+    assert "zoom" in result.missing_skills
+
+
+def test_inferred_project_and_workflow_claims_remain_gaps():
+    result = analyse_ats_match(job("Project coordination and workflow management experience required."))
+    assert "project coordination" in result.missing_skills
+    assert "workflow management" in result.missing_skills
+
+
 def test_vacancy_cannot_create_new_applicant_claim():
     before = verified_skill_keys()
     verified_job_keywords(job("Must have Salesforce, Workday and Google Workspace expertise."))
