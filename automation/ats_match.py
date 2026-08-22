@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 
-from automation.tailoring import BASE_SKILLS, SEMANTIC_SKILL_GROUPS, classify_job, extract_keywords
+from automation.claims_ledger import evidence_for, verified_skill_keys
+from automation.tailoring import classify_job, extract_keywords
 from core.models import Job
 
 
@@ -14,35 +15,25 @@ class ATSMatchResult:
 
 
 def verified_skill_set(category: str) -> set[str]:
-    """Return only skills supported by the verified profile evidence."""
-    verified = set()
-    for skill in BASE_SKILLS.get(category, ()):
-        lowered = skill.lower()
-        for canonical, variants in SEMANTIC_SKILL_GROUPS.items():
-            if canonical in lowered or any(variant in lowered for variant in variants):
-                verified.add(canonical)
-    verified.update({
-        "recruitment", "onboarding", "employee relations", "human resources",
-        "records management", "reporting", "scheduling", "compliance",
-        "legal research", "contract management", "policy", "client communication",
-        "documentation", "calendar management", "executive support",
-    })
-    return verified
+    """Return only skills backed by the applicant claims ledger.
+
+    Category is retained for API compatibility. It must not manufacture skills.
+    """
+    del category
+    return verified_skill_keys()
 
 
 def verified_job_keywords(job: Job) -> tuple[str, ...]:
-    """Return job requirements that are both detected and supported by verified evidence."""
-    category = classify_job(job)
-    verified = verified_skill_set(category)
-    return tuple(skill for skill in extract_keywords(job) if skill in verified)
+    """Return detected vacancy requirements with concrete applicant evidence."""
+    required = extract_keywords(job)
+    return tuple(skill for skill in required if evidence_for(skill))
 
 
 def analyse_ats_match(job: Job) -> ATSMatchResult:
-    """Score semantic ATS skill coverage without inventing unsupported qualifications."""
+    """Score semantic ATS coverage without inventing unsupported qualifications."""
     category = classify_job(job)
     required = extract_keywords(job)
-    verified = verified_skill_set(category)
-    matched = tuple(skill for skill in required if skill in verified)
-    missing = tuple(skill for skill in required if skill not in verified)
+    matched = tuple(skill for skill in required if evidence_for(skill))
+    missing = tuple(skill for skill in required if not evidence_for(skill))
     score = 100 if not required else round((len(matched) / len(required)) * 100)
     return ATSMatchResult(score=score, category=category, required_skills=required, matched_skills=matched, missing_skills=missing)
