@@ -29,14 +29,9 @@ class TailoringTests(unittest.TestCase):
             for keyword in expected: self.assertIn(keyword, matches)
 
     def test_bullets_are_prioritized_without_rewriting(self):
-        bullets = (
-            "Digitised filing systems and improved document accessibility.",
-            "Supported recruitment and employee record management.",
-            "Managed calendars, meetings and executive correspondence.",
-        )
+        bullets = ("Digitised filing systems and improved document accessibility.", "Supported recruitment and employee record management.", "Managed calendars, meetings and executive correspondence.")
         ranked = prioritize_bullets(bullets, ("calendar management", "scheduling", "executive support"))
-        self.assertEqual(ranked[0], bullets[2])
-        self.assertCountEqual(ranked, bullets)
+        self.assertEqual(ranked[0], bullets[2]); self.assertCountEqual(ranked, bullets)
 
     def test_documents_are_created(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -56,12 +51,8 @@ class TailoringTests(unittest.TestCase):
             old = module.TAILORED_APPLICATIONS_DIR; module.TAILORED_APPLICATIONS_DIR = root / "out"
             try:
                 docs = tailor_documents(job, 20, profile)
-                cv = "\n".join(p.text for p in Document(docs.resume_path).paragraphs).lower()
-                cover = "\n".join(p.text for p in Document(docs.cover_letter_path).paragraphs).lower()
-                self.assertIn("executive support", cv)
-                self.assertNotIn("salesforce", cv)
-                self.assertNotIn("salesforce", cover)
-                self.assertNotIn("salesforce", docs.matched_keywords)
+                cv = "\n".join(p.text for p in Document(docs.resume_path).paragraphs).lower(); cover = "\n".join(p.text for p in Document(docs.cover_letter_path).paragraphs).lower()
+                self.assertIn("executive support", cv); self.assertNotIn("salesforce", cv); self.assertNotIn("salesforce", cover); self.assertNotIn("salesforce", docs.matched_keywords)
             finally: module.TAILORED_APPLICATIONS_DIR = old
 
     def test_cv_headline_matches_job_category(self):
@@ -74,13 +65,24 @@ class TailoringTests(unittest.TestCase):
                 for job_id, (title, description, expected_category) in enumerate(cases, start=1):
                     job = Job("Example", title, "Remote", "test", "https://example.com", description=description); docs = tailor_documents(job, job_id, profile)
                     self.assertEqual(docs.category, expected_category)
-                    text = "\n".join(p.text for p in Document(docs.resume_path).paragraphs)
-                    self.assertIn(CATEGORY_HEADLINES[expected_category], text)
+                    text = "\n".join(p.text for p in Document(docs.resume_path).paragraphs); self.assertIn(CATEGORY_HEADLINES[expected_category], text)
             finally: module.TAILORED_APPLICATIONS_DIR = old
 
     def test_experience_is_prioritized_by_category(self):
         expectations = {"HR_PEOPLE": "Human Resource Manager", "LEGAL_COMPLIANCE": "Legal", "NGO_PROGRAMME": "Legal Officer", "EXECUTIVE_OPERATIONS": "HR Personnel"}
         for category, expected in expectations.items(): self.assertIn(expected, prioritize_experience(category)[0][0])
+
+    def test_hr_vacancy_puts_hr_evidence_before_legal_evidence(self):
+        ranked = prioritize_experience(classify_job(Job("Example", "HR Manager", "Remote", "test", "https://example.com", description="Recruitment, onboarding and employee relations")))
+        titles = [item[0] for item in ranked]
+        self.assertIn("Human Resource Manager", titles[0])
+        self.assertLess(next(i for i, title in enumerate(titles) if "Human Resource" in title), next(i for i, title in enumerate(titles) if "Legal" in title))
+
+    def test_legal_compliance_vacancy_puts_legal_evidence_before_hr_evidence(self):
+        ranked = prioritize_experience(classify_job(Job("Example", "Legal Compliance Officer", "Remote", "test", "https://example.com", description="Legal research, contracts, regulatory compliance and policy")))
+        titles = [item[0] for item in ranked]
+        self.assertIn("Legal", titles[0])
+        self.assertLess(next(i for i, title in enumerate(titles) if "Legal" in title), next(i for i, title in enumerate(titles) if "Human Resource" in title))
 
 
 if __name__ == "__main__": unittest.main()
