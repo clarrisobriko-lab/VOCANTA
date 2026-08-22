@@ -11,6 +11,8 @@ class VerifiedClaim:
 
 # Every claim used for vacancy matching must point to concrete applicant evidence.
 # Vacancy text may select or rank these claims, but may never create a new claim.
+# Claims are deliberately conservative: if the repository does not contain direct
+# evidence for a skill, that skill remains a vacancy gap rather than being inferred.
 CLAIMS: tuple[VerifiedClaim, ...] = (
     VerifiedClaim("recruitment", ("Human Resource Manager: recruitment and employee management", "HR Personnel: recruitment support")),
     VerifiedClaim("onboarding", ("Human Resource Manager: onboarding", "Jam Oil and Gas: onboarding and training programmes")),
@@ -27,11 +29,9 @@ CLAIMS: tuple[VerifiedClaim, ...] = (
     VerifiedClaim("documentation", ("LEDAP: legal documents, briefs and case files", "Legal Associate: case documentation")),
     VerifiedClaim("calendar management", ("HR Personnel: managed calendars and meetings",)),
     VerifiedClaim("executive support", ("HR Personnel: executive correspondence", "Human Resource Manager: reports to leadership")),
-    VerifiedClaim("stakeholder management", ("LEDAP: NGOs and government agencies",)),
-    VerifiedClaim("administrative support", ("HR Personnel: administrative and records support",)),
-    VerifiedClaim("project coordination", ("LEDAP: coordinated multi-party human rights initiatives",)),
+    VerifiedClaim("stakeholder management", ("LEDAP: worked with NGOs and government agencies on human rights initiatives",)),
+    VerifiedClaim("administrative support", ("HR Personnel: managed calendars, meetings and executive correspondence",)),
     VerifiedClaim("training", ("Jam Oil and Gas: training programmes",)),
-    VerifiedClaim("confidential information", ("Legal and HR roles: confidential client and personnel records",)),
 )
 
 
