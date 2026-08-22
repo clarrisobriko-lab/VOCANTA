@@ -9,10 +9,9 @@ class VerifiedClaim:
     evidence: tuple[str, ...]
 
 
-# Every claim used for vacancy matching must point to concrete applicant evidence.
+# Every claim used for vacancy matching must point to verified applicant evidence.
+# Evidence may come from documented work history or an explicit applicant confirmation.
 # Vacancy text may select or rank these claims, but may never create a new claim.
-# Claims are deliberately conservative: if the repository does not contain direct
-# evidence for a skill, that skill remains a vacancy gap rather than being inferred.
 CLAIMS: tuple[VerifiedClaim, ...] = (
     VerifiedClaim("recruitment", ("Human Resource Manager: recruitment and employee management", "HR Personnel: recruitment support")),
     VerifiedClaim("onboarding", ("Human Resource Manager: onboarding", "Jam Oil and Gas: onboarding and training programmes")),
@@ -32,6 +31,8 @@ CLAIMS: tuple[VerifiedClaim, ...] = (
     VerifiedClaim("stakeholder management", ("LEDAP: worked with NGOs and government agencies on human rights initiatives",)),
     VerifiedClaim("administrative support", ("HR Personnel: managed calendars, meetings and executive correspondence",)),
     VerifiedClaim("training", ("Jam Oil and Gas: training programmes",)),
+    VerifiedClaim("zoom", ("Applicant confirmed years of Zoom use",)),
+    VerifiedClaim("slack", ("Applicant confirmed current Slack use",)),
 )
 
 
