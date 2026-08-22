@@ -84,5 +84,17 @@ class TailoringTests(unittest.TestCase):
         self.assertIn("Legal", titles[0])
         self.assertLess(next(i for i, title in enumerate(titles) if "Legal" in title), next(i for i, title in enumerate(titles) if "Human Resource" in title))
 
+    def test_ea_vacancy_prioritizes_executive_admin_evidence(self):
+        vacancy = Job("Example", "Executive Assistant", "Remote", "test", "https://example.com", description="Manage executive calendars, leadership meetings, scheduling, correspondence and stakeholder communication")
+        category = classify_job(vacancy)
+        self.assertEqual(category, "EXECUTIVE_OPERATIONS")
+        ranked = prioritize_experience(category)
+        titles = [item[0] for item in ranked]
+        self.assertIn("HR Personnel", titles[0])
+        self.assertLess(next(i for i, title in enumerate(titles) if "HR Personnel" in title), next(i for i, title in enumerate(titles) if "Legal" in title))
+        bullets = ranked[0][2]
+        prioritized = prioritize_bullets(bullets, ("calendar management", "scheduling", "executive support", "stakeholder management"))
+        self.assertEqual(prioritized[0], "Managed calendars, meetings and executive correspondence.")
+
 
 if __name__ == "__main__": unittest.main()
