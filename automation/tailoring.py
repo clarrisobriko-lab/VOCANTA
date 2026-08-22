@@ -9,6 +9,7 @@ from docx.enum.text import WD_PARAGRAPH_ALIGNMENT
 from automation.profile import ApplicantProfile
 from config.settings import TAILORED_APPLICATIONS_DIR, TAILORING_MAX_KEYWORDS
 from core.models import Job
+from core.text_rules import sanitize_applicant_text
 
 
 @dataclass(frozen=True, slots=True)
@@ -107,6 +108,10 @@ def _normalise_text(value: str) -> str:
     return " ".join(re.sub(r"[^a-z0-9+#]+", " ", value.lower()).split())
 
 
+def _clean(value: str) -> str:
+    return sanitize_applicant_text(value)
+
+
 def extract_keywords(job: Job) -> tuple[str, ...]:
     text = _normalise_text(f"{job.title} {job.description}")
     return tuple(canonical for canonical, variants in SEMANTIC_SKILL_GROUPS.items() if any(_normalise_text(v) in text for v in variants))[:TAILORING_MAX_KEYWORDS]
@@ -140,22 +145,22 @@ def prioritize_bullets(bullets, keywords: tuple[str, ...]):
 
 
 def _add_contact(document: Document, profile: ApplicantProfile) -> None:
-    heading = document.add_heading(profile.full_name.upper(), level=0)
+    heading = document.add_heading(_clean(profile.full_name.upper()), level=0)
     heading.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
     contact = document.add_paragraph()
     contact.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
-    contact.add_run(f"{profile.city}, {profile.country} | {profile.phone} | {profile.email}\nLinkedIn: {profile.linkedin_url}")
+    contact.add_run(_clean(f"{profile.city}, {profile.country} | {profile.phone} | {profile.email}\nLinkedIn: {profile.linkedin_url}"))
 
 
 def build_tailored_cv(job: Job, profile: ApplicantProfile, output: Path) -> None:
     category, keywords, document = classify_job(job), _verified_keywords(job), Document()
     _add_contact(document, profile)
-    document.add_heading(CATEGORY_HEADLINES[category], level=1)
+    document.add_heading(_clean(CATEGORY_HEADLINES[category]), level=1)
     document.add_heading("Professional Profile", level=1)
     summary = CATEGORY_SUMMARIES[category]
     if keywords:
         summary += " Relevant strengths include " + ", ".join(keywords[:6]) + "."
-    document.add_paragraph(summary)
+    document.add_paragraph(_clean(summary))
     document.add_heading("Core Competencies", level=1)
     skills = list(BASE_SKILLS[category])
     for keyword in keywords:
@@ -163,19 +168,19 @@ def build_tailored_cv(job: Job, profile: ApplicantProfile, output: Path) -> None
         if formatted.lower() not in {skill.lower() for skill in skills}:
             skills.insert(0, formatted)
     for skill in skills[:12]:
-        document.add_paragraph(skill, style="List Bullet")
+        document.add_paragraph(_clean(skill), style="List Bullet")
     document.add_heading("Professional Experience", level=1)
     for title, dates, bullets in prioritize_experience(category):
-        document.add_heading(title, level=2)
-        document.add_paragraph(dates)
+        document.add_heading(_clean(title), level=2)
+        document.add_paragraph(_clean(dates))
         for bullet in prioritize_bullets(bullets, keywords):
-            document.add_paragraph(bullet, style="List Bullet")
+            document.add_paragraph(_clean(bullet), style="List Bullet")
     document.add_heading("Leadership and Memberships", level=1)
     for item in ("Director of International Engagements, Street Kid Africa Foundation", "Nigerian Bar Association", "African Bar Association", "Commonwealth Lawyers Association"):
-        document.add_paragraph(item, style="List Bullet")
+        document.add_paragraph(_clean(item), style="List Bullet")
     document.add_heading("Education and Professional Development", level=1)
     for item in ("High Impact Executive Assistant Training Program, Skill2Scale Digital, 2026", "Barrister at Law, Nigerian Law School, 2019 - 2020", "Bachelor of Laws, University of Uyo, 2013 - 2018", "Advanced Diploma in Aviation Management, College of Aviation Studies, 2008 - 2010", "Diploma in Community Development, University of Benin, 2005 - 2007"):
-        document.add_paragraph(item, style="List Bullet")
+        document.add_paragraph(_clean(item), style="List Bullet")
     document.save(output)
 
 
@@ -184,12 +189,12 @@ def build_tailored_cover_letter(job: Job, profile: ApplicantProfile, output: Pat
     _add_contact(document, profile)
     document.add_paragraph(date.today().strftime("%d %B %Y"))
     document.add_paragraph("Dear Hiring Team,")
-    document.add_paragraph(f"I am writing to apply for the {job.title} position at {job.company}. {CATEGORY_SUMMARIES[category]}")
+    document.add_paragraph(_clean(f"I am writing to apply for the {job.title} position at {job.company}. {CATEGORY_SUMMARIES[category]}"))
     relevant = ", ".join(keywords[:5]) if keywords else "stakeholder management, workflow coordination and confidential administration"
-    document.add_paragraph(f"My experience aligns with the role's emphasis on {relevant}. In my current human resources leadership role, I coordinate recruitment, onboarding, employee relations, records and administrative reporting. My earlier legal and nonprofit work strengthened my client communication, documentation, scheduling and cross-functional coordination capabilities.")
-    document.add_paragraph("I bring a practical combination of executive support, operations, people management and compliance awareness. I am comfortable working independently, handling sensitive information and maintaining dependable communication across remote and international teams.")
-    document.add_paragraph(f"I would welcome the opportunity to discuss how I can support {job.company} and contribute to the successful delivery of this role. Thank you for your time and consideration.")
-    document.add_paragraph(f"Kind regards,\n\n{profile.full_name}")
+    document.add_paragraph(_clean(f"My experience aligns with the role's emphasis on {relevant}. In my current human resources leadership role, I coordinate recruitment, onboarding, employee relations, records and administrative reporting. My earlier legal and nonprofit work strengthened my client communication, documentation, scheduling and cross-functional coordination capabilities."))
+    document.add_paragraph(_clean("I bring a practical combination of executive support, operations, people management and compliance awareness. I am comfortable working independently, handling sensitive information and maintaining dependable communication across remote and international teams."))
+    document.add_paragraph(_clean(f"I would welcome the opportunity to discuss how I can support {job.company} and contribute to the successful delivery of this role. Thank you for your time and consideration."))
+    document.add_paragraph(_clean(f"Kind regards,\n\n{profile.full_name}"))
     document.save(output)
 
 
@@ -202,13 +207,11 @@ def tailor_documents(job: Job, job_id: int, profile: ApplicantProfile) -> Tailor
     build_tailored_cover_letter(job, profile, cover)
     certificate = None
     if category in {"EXECUTIVE_OPERATIONS", "NGO_PROGRAMME"}:
-        source = Path(profile.supporting_document_path)
-        if source.is_file():
-            certificate = folder / source.name
-            if source.resolve() != certificate.resolve():
-                certificate.write_bytes(source.read_bytes())
+        from automation.certificates import certificate_for_application
+        certificate = certificate_for_application(folder)
     return TailoredDocuments(category, folder, resume, cover, certificate, _verified_keywords(job))
 
 
-def with_tailored_documents(profile: ApplicantProfile, documents: TailoredDocuments) -> ApplicantProfile:
-    return replace(profile, resume_path=str(documents.resume_path), cover_letter_path=str(documents.cover_letter_path), supporting_document_path=str(documents.certificate_path) if documents.certificate_path else "")
+def anonymize_job(job: Job) -> Job:
+    """Utility used by deterministic document tests."""
+    return replace(job, company=_clean(job.company), title=_clean(job.title), description=_clean(job.description))
