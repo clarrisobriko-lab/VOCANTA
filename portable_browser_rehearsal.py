@@ -27,6 +27,10 @@ def _wait_for_application_controls(page) -> None:
     page.wait_for_timeout(1500)
 
 
+def _job_context(job: Job) -> str:
+    return "\n".join(part for part in (job.title, job.description, job.location, job.employment_type) if part)
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Controlled cross ATS browser rehearsal. Never submits.")
     parser.add_argument("job_id", type=int, help="VOCANTA database job id to rehearse")
@@ -50,6 +54,7 @@ def main() -> int:
         package = build_application_package(job, documents, decision)
         browser_profile = profile_for_package(profile, package)
         validate_browser_documents(browser_profile)
+        vacancy_context = _job_context(job)
         AUTOMATION_SCREENSHOT_DIR.mkdir(parents=True, exist_ok=True)
         BROWSER_PROFILE_DIR.mkdir(parents=True, exist_ok=True)
         screenshot = AUTOMATION_SCREENSHOT_DIR / f"portable_rehearsal_{row['id']}_{adapter.name.lower()}.png"
@@ -63,7 +68,10 @@ def main() -> int:
                 live_adapter = adapter_for_url(page.url)
                 if live_adapter.name != adapter.name:
                     raise RuntimeError(f"Rehearsal blocked: ATS changed from {adapter.name} to {live_adapter.name}")
-                result = fill_ashby_application(page, browser_profile, live_adapter.final_submit_texts) if live_adapter.name == "ASHBY" else fill_application_form(page, browser_profile, live_adapter.final_submit_texts)
+                if live_adapter.name == "ASHBY":
+                    result = fill_ashby_application(page, browser_profile, live_adapter.final_submit_texts)
+                else:
+                    result = fill_application_form(page, browser_profile, live_adapter.final_submit_texts, job_context=vacancy_context)
                 page.wait_for_timeout(1000)
                 page.screenshot(path=str(screenshot), full_page=True)
                 print("PORTABLE CONTROLLED BROWSER REHEARSAL: COMPLETE")
