@@ -5,7 +5,7 @@ import re
 
 from automation.cv_knowledge import answer_from_cv
 from automation.profile import ApplicantProfile
-from automation.questions import identify_intent, resolve_question
+from automation.questions import resolve_question
 
 
 @dataclass(frozen=True, slots=True)
@@ -32,17 +32,16 @@ def _ranked_experience(question: str, profile: ApplicantProfile, job_context: st
 
 
 def answer_application_question(question: str, profile: ApplicantProfile, *, job_context: str = "") -> SemanticAnswer | None:
-    """Resolve an application question from verified applicant evidence only.
+    """Resolve application questions from verified applicant evidence.
 
     Vacancy text may rank evidence, but it can never become an applicant fact.
-    Unknown facts remain unanswered.
+    Missing factual results remain unanswered rather than being inferred.
     """
     q = _norm(question).lower()
 
-    resolution = resolve_question(question, profile)
-    if resolution.value and resolution.auto_fill_allowed:
-        return SemanticAnswer(_clean(resolution.value), f"profile.{resolution.intent.value.lower()}", resolution.confidence / 100)
-
+    # Degree result questions are special. A university name or degree title is
+    # not a result, grade, classification or GPA. Only an explicitly stored
+    # result may answer this field.
     if "bachelor" in q and any(k in q for k in ("result", "grading", "grade", "gpa")):
         for key, value in profile.standard_answers.items():
             key_l = key.lower()
@@ -50,14 +49,23 @@ def answer_application_question(question: str, profile: ApplicantProfile, *, job
                 return SemanticAnswer(_clean(value), "profile.standard_answers.degree_result", 1.0)
         return None
 
-    if any(k in q for k in ("administration", "executive support", "logistics", "events", "travel management")):
-        return _ranked_experience(question, profile, job_context)
+    # Narrative questions must be answered from CV evidence before generic
+    # structured intents such as TRAVEL are considered. This prevents a broad
+    # question mentioning travel from collapsing to a bare Yes/No answer.
+    narrative_terms = (
+        "administration", "executive support", "logistics", "events", "travel management",
+        "take responsibility", "responsibility for something important", "large amount of detail",
+        "high accuracy", "accuracy", "challenge", "experience", "background", "skills",
+        "describe a case", "describe an occasion",
+    )
+    if any(k in q for k in narrative_terms):
+        grounded = _ranked_experience(question, profile, job_context)
+        if grounded:
+            return grounded
 
-    if any(k in q for k in ("take responsibility", "responsibility for something important", "large amount of detail", "high accuracy", "accuracy", "challenge")):
-        return _ranked_experience(question, profile, job_context)
-
-    if any(k in q for k in ("experience", "background", "skills", "describe a case", "describe an occasion")):
-        return _ranked_experience(question, profile, job_context)
+    resolution = resolve_question(question, profile)
+    if resolution.value and resolution.auto_fill_allowed:
+        return SemanticAnswer(_clean(resolution.value), f"profile.{resolution.intent.value.lower()}", resolution.confidence / 100)
 
     grounded = answer_from_cv(question, profile, job_context=job_context)
     if grounded and grounded.value:
