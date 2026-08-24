@@ -73,12 +73,25 @@ def answer_from_cv(question: str, profile: ApplicantProfile, job_context: str = 
     if any(key in q for key in ("current employer", "present employer")):
         current = next((item for item in employment if item.current), None)
         if current and current.employer: return GroundedAnswer(_norm(current.employer), "cv.employment.current.employer", 1.0)
-    if any(key in q for key in ("employment history", "work history", "professional experience", "relevant experience", "tell us about your experience", "background", "skills and experience")):
+
+    # Narrative experience prompts use employment evidence even when the employer
+    # does not use one of our exact stock phrases. The semantic layer decides
+    # that the question is narrative; this layer supplies only grounded CV facts.
+    narrative_experience = (
+        "employment history", "work history", "professional experience", "relevant experience",
+        "tell us about your experience", "background", "skills and experience",
+        "any experience with", "experience with administration", "executive support",
+        "logistics", "events", "travel management", "take responsibility",
+        "responsibility for something important", "large amount of detail",
+        "high accuracy", "describe a case", "describe an occasion",
+    )
+    if any(key in q for key in narrative_experience):
         ranked = _ranked_employment(question, employment, job_context)
         value = _employment_text(ranked)
         if value:
             source = "cv.employment.question_and_vacancy_ranked" if job_context else "cv.employment.relevance_ranked"
             return GroundedAnswer(value, source, 0.95)
+
     if "number of employers" in q and profile.number_of_employers:
         return GroundedAnswer(_norm(profile.number_of_employers), "cv.employment.count", 1.0)
     if any(key in q for key in ("nationality", "citizenship")) and profile.nationality:
