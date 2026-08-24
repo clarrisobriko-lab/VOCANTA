@@ -6,10 +6,11 @@ from pathlib import Path
 from docx import Document
 from docx.enum.text import WD_PARAGRAPH_ALIGNMENT
 
+from automation.candidate_knowledge import load_candidate_knowledge
 from automation.profile import ApplicantProfile
 from config.settings import TAILORED_APPLICATIONS_DIR, TAILORING_MAX_KEYWORDS
 from core.models import Job
-from core.text_rules import sanitize_applicant_text
+from core.text_rules import sanitize_applicant_text, sanitize_user_filename
 
 
 @dataclass(frozen=True, slots=True)
@@ -55,10 +56,7 @@ SEMANTIC_SKILL_GROUPS = {
     "policy": ("policy", "policies", "policy development", "policy implementation", "policy review"),
     "google workspace": ("google workspace", "google suite", "g suite"),
     "microsoft office": ("microsoft office", "microsoft 365", "ms office", "office 365"),
-    "slack": ("slack",),
-    "zoom": ("zoom", "video conferencing"),
-    "salesforce": ("salesforce", "salesforce crm"),
-    "workday": ("workday", "workday hcm"),
+    "slack": ("slack",), "zoom": ("zoom", "video conferencing"), "salesforce": ("salesforce", "salesforce crm"), "workday": ("workday", "workday hcm"),
     "confidential information": ("confidential information", "sensitive information", "confidential records", "data confidentiality"),
     "reporting": ("reporting", "management reports", "report preparation", "prepare reports", "reports"),
     "scheduling": ("scheduling", "schedule management", "appointment scheduling", "meeting coordination", "coordinate meetings", "leadership meetings", "schedules", "meetings"),
@@ -77,6 +75,8 @@ BASE_SKILLS = {
     "LEGAL_COMPLIANCE": ["Legal documentation and case administration", "Compliance and policy support", "Client communication and consultation scheduling", "Legal research and drafting", "Contract and records management", "Stakeholder coordination", "Confidential information management", "Administrative reporting", "Microsoft Office and Google Workspace", "Project and workflow coordination"],
     "NGO_PROGRAMME": ["Programme and administrative coordination", "Stakeholder and government engagement", "Human rights and access to justice support", "Project and workflow management", "Documentation and records management", "Client and beneficiary communication", "Recruitment and onboarding", "Compliance administration", "Microsoft Office and Google Workspace", "Remote team collaboration"],
 }
+# Compatibility fallback for deterministic legacy tests. Live document generation now
+# supplements this with evidence extracted from the candidate master CV.
 VERIFIED_EXPERIENCE = [
     ("Human Resource Manager, Malachy Godian Enterprises", "January 2025 - Present", ["Oversee recruitment, onboarding and employee management processes.", "Develop and implement policies to improve operational efficiency and compliance.", "Manage employee relations, internal communications and workforce planning.", "Maintain personnel records and provide administrative reports to leadership."]),
     ("Human Resource Manager, Jam Oil and Gas Limited", "January 2024 - December 2024", ["Coordinated onboarding, training programmes and staff scheduling.", "Maintained personnel records and supported management reporting.", "Handled internal communications across multiple departments."]),
@@ -94,8 +94,7 @@ EXPERIENCE_TITLE_TERMS = {"EXECUTIVE_OPERATIONS": ("executive", "administrative"
 
 
 def safe_name(value: str) -> str:
-    cleaned = re.sub(r"[^A-Za-z0-9._-]+", "_", value.strip())
-    return cleaned.strip("_")[:80] or "application"
+    return sanitize_user_filename(value, fallback="application")
 
 
 def classify_job(job: Job) -> str:
@@ -132,24 +131,40 @@ def prioritize_experience(category: str):
 
 
 def prioritize_bullets(bullets, keywords: tuple[str, ...]):
-    """Reorder existing verified bullets by vacancy relevance without rewriting or inventing evidence."""
     def relevance(bullet: str) -> int:
         text = _normalise_text(bullet)
-        score = 0
-        for keyword in keywords:
-            variants = SEMANTIC_SKILL_GROUPS.get(keyword, (keyword,))
-            if any(_normalise_text(variant) in text for variant in variants):
-                score += 1
-        return score
+        return sum(1 for keyword in keywords if any(_normalise_text(v) in text for v in SEMANTIC_SKILL_GROUPS.get(keyword, (keyword,))))
     return tuple(bullet for _, bullet in sorted(enumerate(bullets), key=lambda pair: (-relevance(pair[1]), pair[0])))
 
 
 def _add_contact(document: Document, profile: ApplicantProfile) -> None:
     heading = document.add_heading(_clean(profile.full_name.upper()), level=0)
     heading.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
-    contact = document.add_paragraph()
-    contact.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
+    contact = document.add_paragraph(); contact.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
     contact.add_run(_clean(f"{profile.city}, {profile.country} | {profile.phone} | {profile.email}\nLinkedIn: {profile.linkedin_url}"))
+
+
+def _add_cv_evidence(document: Document, job: Job, profile: ApplicantProfile) -> None:
+    knowledge = load_candidate_knowledge(profile)
+    prompts = (
+        "administration executive support scheduling coordination stakeholder management",
+        "responsibility ownership important organisation",
+        "large amount of detail high accuracy records documentation",
+        "logistics events travel management meetings",
+    )
+    job_context = f"{job.title} {job.description}"
+    evidence = []
+    seen = set()
+    for prompt in prompts:
+        for item in knowledge.rank(prompt, job_context, limit=3):
+            text = _clean(item.text)
+            key = text.lower()
+            if len(text) >= 30 and key not in seen:
+                seen.add(key); evidence.append(text)
+    if evidence:
+        document.add_heading("Detailed Professional Evidence", level=1)
+        for text in evidence[:10]:
+            document.add_paragraph(text, style="List Bullet")
 
 
 def build_tailored_cv(job: Job, profile: ApplicantProfile, output: Path) -> None:
@@ -158,53 +173,46 @@ def build_tailored_cv(job: Job, profile: ApplicantProfile, output: Path) -> None
     document.add_heading(_clean(CATEGORY_HEADLINES[category]), level=1)
     document.add_heading("Professional Profile", level=1)
     summary = CATEGORY_SUMMARIES[category]
-    if keywords:
-        summary += " Relevant strengths include " + ", ".join(keywords[:6]) + "."
+    if keywords: summary += " Relevant strengths include " + ", ".join(keywords[:6]) + "."
     document.add_paragraph(_clean(summary))
     document.add_heading("Core Competencies", level=1)
     skills = list(BASE_SKILLS[category])
     for keyword in keywords:
         formatted = keyword.title()
-        if formatted.lower() not in {skill.lower() for skill in skills}:
-            skills.insert(0, formatted)
-    for skill in skills[:12]:
-        document.add_paragraph(_clean(skill), style="List Bullet")
+        if formatted.lower() not in {skill.lower() for skill in skills}: skills.insert(0, formatted)
+    for skill in skills[:12]: document.add_paragraph(_clean(skill), style="List Bullet")
     document.add_heading("Professional Experience", level=1)
     for title, dates, bullets in prioritize_experience(category):
-        document.add_heading(_clean(title), level=2)
-        document.add_paragraph(_clean(dates))
-        for bullet in prioritize_bullets(bullets, keywords):
-            document.add_paragraph(_clean(bullet), style="List Bullet")
+        document.add_heading(_clean(title), level=2); document.add_paragraph(_clean(dates))
+        for bullet in prioritize_bullets(bullets, keywords): document.add_paragraph(_clean(bullet), style="List Bullet")
+    _add_cv_evidence(document, job, profile)
     document.add_heading("Leadership and Memberships", level=1)
     for item in ("Director of International Engagements, Street Kid Africa Foundation", "Nigerian Bar Association", "African Bar Association", "Commonwealth Lawyers Association"):
         document.add_paragraph(_clean(item), style="List Bullet")
     document.add_heading("Education and Professional Development", level=1)
-    for item in ("High Impact Executive Assistant Training Program, Skill2Scale Digital, 2026", "Barrister at Law, Nigerian Law School, 2019 - 2020", "Bachelor of Laws, University of Uyo, 2013 - 2018", "Advanced Diploma in Aviation Management, College of Aviation Studies, 2008 - 2010", "Diploma in Community Development, University of Benin, 2005 - 2007"):
-        document.add_paragraph(_clean(item), style="List Bullet")
+    education = profile.highest_education
+    document.add_paragraph(_clean(f"{education.degree}, {education.institution}, {education.graduation_year}, {education.discipline}"), style="List Bullet")
     document.save(output)
 
 
 def build_tailored_cover_letter(job: Job, profile: ApplicantProfile, output: Path) -> None:
-    category, keywords, document = classify_job(job), _verified_keywords(job), Document()
-    _add_contact(document, profile)
-    document.add_paragraph(date.today().strftime("%d %B %Y"))
-    document.add_paragraph("Dear Hiring Team,")
+    category, keywords, document = classify_job(job), _verified_keywords(job), Document(); _add_contact(document, profile)
+    document.add_paragraph(date.today().strftime("%d %B %Y")); document.add_paragraph("Dear Hiring Team,")
     document.add_paragraph(_clean(f"I am writing to apply for the {job.title} position at {job.company}. {CATEGORY_SUMMARIES[category]}"))
-    relevant = ", ".join(keywords[:5]) if keywords else "stakeholder management, workflow coordination and confidential administration"
-    document.add_paragraph(_clean(f"My experience aligns with the role's emphasis on {relevant}. In my current human resources leadership role, I coordinate recruitment, onboarding, employee relations, records and administrative reporting. My earlier legal and nonprofit work strengthened my client communication, documentation, scheduling and cross-functional coordination capabilities."))
-    document.add_paragraph(_clean("I bring a practical combination of executive support, operations, people management and compliance awareness. I am comfortable working independently, handling sensitive information and maintaining dependable communication across remote and international teams."))
-    document.add_paragraph(_clean(f"I would welcome the opportunity to discuss how I can support {job.company} and contribute to the successful delivery of this role. Thank you for your time and consideration."))
-    document.add_paragraph(_clean(f"Kind regards,\n\n{profile.full_name}"))
-    document.save(output)
+    evidence = load_candidate_knowledge(profile).narrative(f"relevant experience for {job.title}", f"{job.title} {job.description}", max_chars=900)
+    if evidence: document.add_paragraph(_clean(evidence))
+    relevant = ", ".join(keywords[:5]) if keywords else "stakeholder management, workflow coordination and administration"
+    document.add_paragraph(_clean(f"My experience aligns with the role's emphasis on {relevant}. I bring practical experience across administration, people operations, legal work and stakeholder communication."))
+    document.add_paragraph(_clean(f"I would welcome the opportunity to discuss how I can support {job.company}. Thank you for your time and consideration."))
+    document.add_paragraph(_clean(f"Kind regards,\n\n{profile.full_name}")); document.save(output)
 
 
 def tailor_documents(job: Job, job_id: int, profile: ApplicantProfile) -> TailoredDocuments:
     category = classify_job(job)
-    folder = TAILORED_APPLICATIONS_DIR / f"{job_id}_{safe_name(job.company)}_{safe_name(job.title)}"
+    folder = TAILORED_APPLICATIONS_DIR / f"{job_id} {safe_name(job.company)} {safe_name(job.title)}"
     folder.mkdir(parents=True, exist_ok=True)
-    resume, cover = folder / "tailored_cv.docx", folder / "tailored_cover_letter.docx"
-    build_tailored_cv(job, profile, resume)
-    build_tailored_cover_letter(job, profile, cover)
+    resume, cover = folder / "Tailored CV.docx", folder / "Tailored Cover Letter.docx"
+    build_tailored_cv(job, profile, resume); build_tailored_cover_letter(job, profile, cover)
     certificate = None
     if category in {"EXECUTIVE_OPERATIONS", "NGO_PROGRAMME"}:
         from automation.certificates import certificate_for_application
@@ -213,5 +221,4 @@ def tailor_documents(job: Job, job_id: int, profile: ApplicantProfile) -> Tailor
 
 
 def anonymize_job(job: Job) -> Job:
-    """Utility used by deterministic document tests."""
     return replace(job, company=_clean(job.company), title=_clean(job.title), description=_clean(job.description))
