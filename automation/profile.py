@@ -72,6 +72,7 @@ class ApplicantProfile:
     demographics: dict[str, str] = field(default_factory=dict)
     auto_fill_demographics: bool = False
     privacy_acknowledgements: bool = True
+    source_resume_path: str = ""
     resume_path: str = str(MASTER_CV_FILE)
     cover_letter_path: str = str(MASTER_COVER_LETTER_FILE)
     supporting_document_path: str = str(EXECUTIVE_ASSISTANT_CERTIFICATE_FILE)
@@ -84,22 +85,19 @@ class ApplicantProfile:
     def employer_last_name(self) -> str:
         return " ".join(part.strip() for part in (self.middle_name, self.last_name) if part.strip())
 
+    @property
+    def knowledge_resume_path(self) -> str:
+        return self.source_resume_path or self.resume_path
+
     def validate(self) -> list[str]:
         errors: list[str] = []
-        for key, value in {
-            "first_name": self.first_name,
-            "last_name": self.last_name,
-            "email": self.email,
-            "phone": self.phone,
-            "country": self.country,
-            "nationality": self.nationality,
-        }.items():
+        for key, value in {"first_name": self.first_name, "last_name": self.last_name, "email": self.email, "phone": self.phone, "country": self.country, "nationality": self.nationality}.items():
             if not str(value).strip(): errors.append(f"Missing required profile field: {key}")
         if "@" not in self.email: errors.append("Email address is invalid")
-        if not self.highest_education.institution or not self.highest_education.degree:
-            errors.append("Highest education record is incomplete")
+        if not self.highest_education.institution or not self.highest_education.degree: errors.append("Highest education record is incomplete")
         for label, value in (("Resume", self.resume_path), ("Cover letter", self.cover_letter_path), ("Supporting document", self.supporting_document_path)):
             if value and not Path(value).expanduser().is_file(): errors.append(f"{label} file not found: {Path(value).expanduser()}")
+        if self.source_resume_path and not Path(self.source_resume_path).expanduser().is_file(): errors.append(f"Source resume file not found: {Path(self.source_resume_path).expanduser()}")
         return errors
 
 
@@ -117,20 +115,10 @@ def save_profile(profile: ApplicantProfile, path: Path = APPLICANT_PROFILE_FILE)
 
 
 def remember_verified_answer(profile: ApplicantProfile, question: str, answer: str, path: Path = APPLICANT_PROFILE_FILE) -> ApplicantProfile:
-    """Persist a candidate supplied fact or approved response for reuse.
-
-    This is the only route by which an unanswered factual field becomes reusable
-    knowledge. The application engine itself never invents the missing value.
-    """
-    key = " ".join((question or "").lower().split())
-    value = " ".join((answer or "").split())
-    if not key or not value:
-        return profile
-    answers = dict(profile.standard_answers)
-    answers[key] = value
-    updated = replace(profile, standard_answers=answers)
-    save_profile(updated, path)
-    return updated
+    key = " ".join((question or "").lower().split()); value = " ".join((answer or "").split())
+    if not key or not value: return profile
+    answers = dict(profile.standard_answers); answers[key] = value
+    updated = replace(profile, standard_answers=answers); save_profile(updated, path); return updated
 
 
 def _copy_if_missing(source: Path, destination: Path) -> None:
@@ -154,15 +142,7 @@ def _legacy_profile_candidates() -> list[Path]:
 
 
 def _bootstrap_approved_profile(path: Path) -> None:
-    save_profile(ApplicantProfile(
-        first_name="Clarris", middle_name="Phegor", last_name="Obriko",
-        email="Clarrisobriko@gmail.com", phone="+2348055632432",
-        city="Abuja", country="Nigeria", address="20 IW Osisiogwu Crescent, Utako",
-        postal_code="900108",
-        linkedin_url="https://www.linkedin.com/in/phegor-clarris-obriko-880b81104",
-        website_url="", work_authorization="No, I require employer sponsorship",
-        requires_sponsorship=True, notice_period="Immediately available", salary_expectation="",
-    ), path)
+    save_profile(ApplicantProfile(first_name="Clarris", middle_name="Phegor", last_name="Obriko", email="Clarrisobriko@gmail.com", phone="+2348055632432", city="Abuja", country="Nigeria", address="20 IW Osisiogwu Crescent, Utako", postal_code="900108", linkedin_url="https://www.linkedin.com/in/phegor-clarris-obriko-880b81104", website_url="", work_authorization="No, I require employer sponsorship", requires_sponsorship=True, notice_period="Immediately available", salary_expectation="", source_resume_path=str(MASTER_CV_FILE)), path)
 
 
 def _repair_asset_paths(profile: ApplicantProfile) -> ApplicantProfile:
@@ -171,12 +151,14 @@ def _repair_asset_paths(profile: ApplicantProfile) -> ApplicantProfile:
     for field_name, persistent_path in replacements.items():
         current = Path(getattr(profile, field_name) or "").expanduser()
         if not current.is_file() and persistent_path.is_file(): updates[field_name] = str(persistent_path)
+    source = Path(profile.source_resume_path or "").expanduser() if profile.source_resume_path else None
+    if (not source or not source.is_file()) and MASTER_CV_FILE.is_file(): updates["source_resume_path"] = str(MASTER_CV_FILE)
     return replace(profile, **updates) if updates else profile
 
 
 def _coerce_profile(data: dict) -> ApplicantProfile:
     data = dict(data)
-    defaults = ApplicantProfile(first_name="", middle_name="", last_name="", email="", phone="", city="", country="Nigeria", address="", postal_code="", linkedin_url="", website_url="", work_authorization="No, I require employer sponsorship", requires_sponsorship=True, notice_period="Immediately available", salary_expectation="")
+    defaults = ApplicantProfile(first_name="", middle_name="", last_name="", email="", phone="", city="", country="Nigeria", address="", postal_code="", linkedin_url="", website_url="", work_authorization="No, I require employer sponsorship", requires_sponsorship=True, notice_period="Immediately available", salary_expectation="", source_resume_path=str(MASTER_CV_FILE))
     for key, value in _profile_payload(defaults).items(): data.setdefault(key, value)
     data["preferred_countries"] = tuple(data.get("preferred_countries") or ())
     data["highest_education"] = EducationRecord(**(data.get("highest_education") or {}))
