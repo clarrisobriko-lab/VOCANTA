@@ -7,35 +7,13 @@ from automation.profile import ApplicantProfile
 
 class Intent(str, Enum):
     UNKNOWN = "UNKNOWN"
-    FIRST_NAME = "FIRST_NAME"
-    MIDDLE_NAME = "MIDDLE_NAME"
-    LAST_NAME = "LAST_NAME"
-    FULL_NAME = "FULL_NAME"
-    EMAIL = "EMAIL"
-    PHONE = "PHONE"
-    CITY = "CITY"
-    CURRENT_COUNTRY = "CURRENT_COUNTRY"
-    NATIONALITY = "NATIONALITY"
-    REGION = "REGION"
-    ADDRESS = "ADDRESS"
-    POSTAL_CODE = "POSTAL_CODE"
-    LINKEDIN = "LINKEDIN"
-    WEBSITE = "WEBSITE"
-    UNIVERSITY = "UNIVERSITY"
-    DEGREE = "DEGREE"
-    DISCIPLINE = "DISCIPLINE"
-    GRADUATION_YEAR = "GRADUATION_YEAR"
-    SPONSORSHIP = "SPONSORSHIP"
-    WORK_AUTHORIZATION = "WORK_AUTHORIZATION"
-    RELOCATION = "RELOCATION"
-    REMOTE_PREFERENCE = "REMOTE_PREFERENCE"
-    TRAVEL = "TRAVEL"
-    EMPLOYER_COUNT = "EMPLOYER_COUNT"
-    NOTICE_PERIOD = "NOTICE_PERIOD"
-    SALARY = "SALARY"
-    PRIVACY_ACKNOWLEDGEMENT = "PRIVACY_ACKNOWLEDGEMENT"
-    DEMOGRAPHIC = "DEMOGRAPHIC"
-    WRITTEN_RESPONSE = "WRITTEN_RESPONSE"
+    FIRST_NAME = "FIRST_NAME"; MIDDLE_NAME = "MIDDLE_NAME"; LAST_NAME = "LAST_NAME"; FULL_NAME = "FULL_NAME"
+    EMAIL = "EMAIL"; PHONE = "PHONE"; CITY = "CITY"; CURRENT_COUNTRY = "CURRENT_COUNTRY"; NATIONALITY = "NATIONALITY"; REGION = "REGION"
+    ADDRESS = "ADDRESS"; POSTAL_CODE = "POSTAL_CODE"; LINKEDIN = "LINKEDIN"; WEBSITE = "WEBSITE"
+    UNIVERSITY = "UNIVERSITY"; DEGREE = "DEGREE"; DISCIPLINE = "DISCIPLINE"; GRADUATION_YEAR = "GRADUATION_YEAR"
+    SPONSORSHIP = "SPONSORSHIP"; WORK_AUTHORIZATION = "WORK_AUTHORIZATION"; RELOCATION = "RELOCATION"; REMOTE_PREFERENCE = "REMOTE_PREFERENCE"
+    TRAVEL = "TRAVEL"; EMPLOYER_COUNT = "EMPLOYER_COUNT"; NOTICE_PERIOD = "NOTICE_PERIOD"; SALARY = "SALARY"
+    PRIVACY_ACKNOWLEDGEMENT = "PRIVACY_ACKNOWLEDGEMENT"; DEMOGRAPHIC = "DEMOGRAPHIC"; WRITTEN_RESPONSE = "WRITTEN_RESPONSE"
 
 
 @dataclass(frozen=True, slots=True)
@@ -57,7 +35,7 @@ INTENT_ALIASES: tuple[tuple[Intent, tuple[str, ...]], ...] = (
     (Intent.FIRST_NAME, ("first name", "given name")), (Intent.MIDDLE_NAME, ("middle name", "middle initial")),
     (Intent.LAST_NAME, ("last name", "surname", "family name")), (Intent.FULL_NAME, ("full name", "candidate name", "your name")),
     (Intent.EMAIL, ("email", "e-mail")), (Intent.PHONE, ("phone", "mobile", "telephone", "contact number")),
-    (Intent.CURRENT_COUNTRY, ("current country", "country of residence", "where are you currently based", "country")),
+    (Intent.CURRENT_COUNTRY, ("current country", "country of residence", "where are you currently based", "in which country do you currently work", "currently work")),
     (Intent.NATIONALITY, ("nationality", "citizenship", "citizen of")), (Intent.REGION, ("region", "geographic region")),
     (Intent.CITY, ("current city", "city", "location")), (Intent.ADDRESS, ("street address", "home address", "address")),
     (Intent.POSTAL_CODE, ("postal code", "postcode", "zip code")), (Intent.LINKEDIN, ("linkedin",)),
@@ -66,10 +44,11 @@ INTENT_ALIASES: tuple[tuple[Intent, tuple[str, ...]], ...] = (
     (Intent.GRADUATION_YEAR, ("graduation year", "year graduated", "completion year")), (Intent.SPONSORSHIP, ("require sponsorship", "visa sponsorship", "sponsorship")),
     (Intent.WORK_AUTHORIZATION, ("work authorization", "work authorisation", "legally authorised", "legally authorized")),
     (Intent.RELOCATION, ("relocate", "relocation")), (Intent.REMOTE_PREFERENCE, ("remote preference", "remote work")),
-    (Intent.TRAVEL, ("travel commitment", "willing to travel", "travel")), (Intent.EMPLOYER_COUNT, ("number of employers", "how many employers", "previous employers")),
+    (Intent.TRAVEL, ("travel commitment", "willing to travel", "international travel", "able to commit to this")),
+    (Intent.EMPLOYER_COUNT, ("number of employers", "how many employers", "previous employers", "how many companies have you worked for")),
     (Intent.NOTICE_PERIOD, ("notice period", "when can you start", "availability")),
     (Intent.SALARY, ("salary expectation", "expected salary", "desired salary", "compensation expectation")),
-    (Intent.PRIVACY_ACKNOWLEDGEMENT, ("privacy notice", "privacy policy", "data processing", "acknowledge")),
+    (Intent.PRIVACY_ACKNOWLEDGEMENT, ("privacy notice", "privacy policy", "data processing", "acknowledge", "read and agree")),
 )
 
 DEMOGRAPHIC_TERMS = ("gender", "race", "ethnicity", "disability", "veteran", "sexual orientation", "religion", "age range")
@@ -87,16 +66,19 @@ def restriction_reason(text: str) -> str:
     normalized = normalize(text)
     for pattern in RESTRICTION_PATTERNS:
         if re.search(pattern, normalized, flags=re.IGNORECASE):
-            return f"Employer requires a personally authored response: {normalized[:220]}"
+            return f"Employer declaration requires candidate review: {normalized[:220]}"
     return ""
 
 
 def identify_intent(label: str) -> Intent:
     normalized = normalize(label)
+    if normalized == "school": return Intent.UNIVERSITY
+    if normalized == "degree": return Intent.DEGREE
+    if normalized == "discipline": return Intent.DISCIPLINE
     if any(term in normalized for term in DEMOGRAPHIC_TERMS): return Intent.DEMOGRAPHIC
     for intent, aliases in INTENT_ALIASES:
         if any(alias == normalized or alias in normalized for alias in aliases): return intent
-    if any(term in normalized for term in ("why", "describe", "explain", "tell us", "motivation", "cover letter")): return Intent.WRITTEN_RESPONSE
+    if any(term in normalized for term in ("why", "describe", "explain", "tell us", "motivation", "cover letter", "occasion", "case where")): return Intent.WRITTEN_RESPONSE
     return Intent.UNKNOWN
 
 
@@ -108,16 +90,13 @@ def _dynamic_standard_answer(label: str, answers: dict[str, str]) -> tuple[str, 
         if not value: continue
         candidate = _tokens(stored_label)
         if not candidate: continue
-        overlap = len(target & candidate)
-        score = round(100 * overlap / max(len(target), len(candidate)))
-        if score > best_score:
-            best_value, best_score = value, score
+        overlap = len(target & candidate); score = round(100 * overlap / max(len(target), len(candidate)))
+        if score > best_score: best_value, best_score = value, score
     return (best_value, best_score) if best_score >= 60 else ("", best_score)
 
 
 def resolve_question(label: str, profile: ApplicantProfile, *, has_middle_name_field: bool = True) -> QuestionResolution:
-    restriction = restriction_reason(label)
-    intent = identify_intent(label)
+    restriction = restriction_reason(label); intent = identify_intent(label)
     if restriction: return QuestionResolution(intent, "", 100, False, restriction)
     values = {
         Intent.FIRST_NAME: profile.first_name, Intent.MIDDLE_NAME: profile.middle_name,
