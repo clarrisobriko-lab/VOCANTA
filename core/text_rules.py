@@ -21,24 +21,35 @@ def normalize_text(value: str | None) -> str:
 
 
 def sanitize_applicant_text(value: str | None) -> str:
-    """Remove typographic dashes from applicant facing generated prose.
+    """Enforce applicant facing punctuation rules.
 
-    VOCANTA deliberately avoids em and en dashes in CVs, cover letters and
-    application answers. A spaced dash is treated as a clause separator and
-    becomes a comma. Remaining dash characters are replaced with spaces so
-    date ranges and compounds remain readable without introducing forbidden
-    punctuation.
+    Em dashes and en dashes are never allowed in generated CVs, cover letters,
+    application answers or other employer facing prose. They are converted to
+    commas. Ordinary hyphens are preserved because they can be meaningful in
+    names, dates and technical terms.
     """
     text = value or ""
     text = re.sub(r"\s*[\u2013\u2014]\s*", ", ", text)
-    text = re.sub(r"\s*-\s*", " ", text)
     text = re.sub(r"\s+,\s*", ", ", text)
     text = re.sub(r",\s*,+", ",", text)
     return re.sub(r"[ \t]{2,}", " ", text).strip()
 
 
+def sanitize_user_filename(value: str | None, *, fallback: str = "document") -> str:
+    """Return a clean employer facing filename stem with no underscores or typographic dashes."""
+    text = sanitize_applicant_text(value or "")
+    text = text.replace("_", " ")
+    text = re.sub(r"[^A-Za-z0-9 .()&,+-]+", " ", text)
+    text = re.sub(r"\s+", " ", text).strip(" .")
+    return text[:120] or fallback
+
+
 def has_forbidden_dashes(value: str | None) -> bool:
     return any(character in (value or "") for character in ("\u2013", "\u2014"))
+
+
+def has_forbidden_filename_separator(value: str | None) -> bool:
+    return "_" in (value or "") or has_forbidden_dashes(value)
 
 
 def _pattern(term: str) -> re.Pattern[str]:
