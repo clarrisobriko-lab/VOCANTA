@@ -69,7 +69,7 @@ def main() -> int:
                 if live_adapter.name != adapter.name:
                     raise RuntimeError(f"Rehearsal blocked: ATS changed from {adapter.name} to {live_adapter.name}")
                 if live_adapter.name == "ASHBY":
-                    result = fill_ashby_application(page, browser_profile, live_adapter.final_submit_texts)
+                    result = fill_ashby_application(page, browser_profile, live_adapter.final_submit_texts, job_context=vacancy_context)
                 else:
                     result = fill_application_form(page, browser_profile, live_adapter.final_submit_texts, job_context=vacancy_context)
                 page.wait_for_timeout(1000)
