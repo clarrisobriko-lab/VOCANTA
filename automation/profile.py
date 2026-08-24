@@ -94,19 +94,12 @@ class ApplicantProfile:
             "country": self.country,
             "nationality": self.nationality,
         }.items():
-            if not str(value).strip():
-                errors.append(f"Missing required profile field: {key}")
-        if "@" not in self.email:
-            errors.append("Email address is invalid")
+            if not str(value).strip(): errors.append(f"Missing required profile field: {key}")
+        if "@" not in self.email: errors.append("Email address is invalid")
         if not self.highest_education.institution or not self.highest_education.degree:
             errors.append("Highest education record is incomplete")
-        for label, value in (
-            ("Resume", self.resume_path),
-            ("Cover letter", self.cover_letter_path),
-            ("Supporting document", self.supporting_document_path),
-        ):
-            if value and not Path(value).expanduser().is_file():
-                errors.append(f"{label} file not found: {Path(value).expanduser()}")
+        for label, value in (("Resume", self.resume_path), ("Cover letter", self.cover_letter_path), ("Supporting document", self.supporting_document_path)):
+            if value and not Path(value).expanduser().is_file(): errors.append(f"{label} file not found: {Path(value).expanduser()}")
         return errors
 
 
@@ -123,11 +116,26 @@ def save_profile(profile: ApplicantProfile, path: Path = APPLICANT_PROFILE_FILE)
     path.write_text(json.dumps(_profile_payload(profile), indent=2, ensure_ascii=False), encoding="utf-8")
 
 
+def remember_verified_answer(profile: ApplicantProfile, question: str, answer: str, path: Path = APPLICANT_PROFILE_FILE) -> ApplicantProfile:
+    """Persist a candidate supplied fact or approved response for reuse.
+
+    This is the only route by which an unanswered factual field becomes reusable
+    knowledge. The application engine itself never invents the missing value.
+    """
+    key = " ".join((question or "").lower().split())
+    value = " ".join((answer or "").split())
+    if not key or not value:
+        return profile
+    answers = dict(profile.standard_answers)
+    answers[key] = value
+    updated = replace(profile, standard_answers=answers)
+    save_profile(updated, path)
+    return updated
+
+
 def _copy_if_missing(source: Path, destination: Path) -> None:
-    if destination.is_file() or not source.is_file():
-        return
-    destination.parent.mkdir(parents=True, exist_ok=True)
-    shutil.copy2(source, destination)
+    if destination.is_file() or not source.is_file(): return
+    destination.parent.mkdir(parents=True, exist_ok=True); shutil.copy2(source, destination)
 
 
 def ensure_persistent_assets() -> None:
@@ -138,8 +146,7 @@ def ensure_persistent_assets() -> None:
 
 
 def _legacy_profile_candidates() -> list[Path]:
-    downloads = Path.home() / "Downloads"
-    candidates: list[Path] = []
+    downloads = Path.home() / "Downloads"; candidates: list[Path] = []
     for pattern in ("VOCANTA_v*", "VOCANTA*"):
         for folder in downloads.glob(pattern):
             candidates.extend([folder / "data" / "applicant_profile.json", folder / folder.name / "data" / "applicant_profile.json"])
@@ -159,29 +166,18 @@ def _bootstrap_approved_profile(path: Path) -> None:
 
 
 def _repair_asset_paths(profile: ApplicantProfile) -> ApplicantProfile:
-    replacements = {
-        "resume_path": MASTER_CV_FILE,
-        "cover_letter_path": MASTER_COVER_LETTER_FILE,
-        "supporting_document_path": EXECUTIVE_ASSISTANT_CERTIFICATE_FILE,
-    }
+    replacements = {"resume_path": MASTER_CV_FILE, "cover_letter_path": MASTER_COVER_LETTER_FILE, "supporting_document_path": EXECUTIVE_ASSISTANT_CERTIFICATE_FILE}
     updates: dict[str, str] = {}
     for field_name, persistent_path in replacements.items():
         current = Path(getattr(profile, field_name) or "").expanduser()
-        if not current.is_file() and persistent_path.is_file():
-            updates[field_name] = str(persistent_path)
+        if not current.is_file() and persistent_path.is_file(): updates[field_name] = str(persistent_path)
     return replace(profile, **updates) if updates else profile
 
 
 def _coerce_profile(data: dict) -> ApplicantProfile:
     data = dict(data)
-    defaults = ApplicantProfile(
-        first_name="", middle_name="", last_name="", email="", phone="", city="", country="Nigeria",
-        address="", postal_code="", linkedin_url="", website_url="",
-        work_authorization="No, I require employer sponsorship", requires_sponsorship=True,
-        notice_period="Immediately available", salary_expectation="",
-    )
-    for key, value in _profile_payload(defaults).items():
-        data.setdefault(key, value)
+    defaults = ApplicantProfile(first_name="", middle_name="", last_name="", email="", phone="", city="", country="Nigeria", address="", postal_code="", linkedin_url="", website_url="", work_authorization="No, I require employer sponsorship", requires_sponsorship=True, notice_period="Immediately available", salary_expectation="")
+    for key, value in _profile_payload(defaults).items(): data.setdefault(key, value)
     data["preferred_countries"] = tuple(data.get("preferred_countries") or ())
     data["highest_education"] = EducationRecord(**(data.get("highest_education") or {}))
     data["employment_history"] = tuple(EmploymentRecord(**item) for item in (data.get("employment_history") or ()))
@@ -192,15 +188,10 @@ def load_profile(path: Path = APPLICANT_PROFILE_FILE) -> ApplicantProfile:
     ensure_persistent_assets()
     if not path.is_file():
         for candidate in _legacy_profile_candidates():
-            if candidate.is_file():
-                path.parent.mkdir(parents=True, exist_ok=True)
-                shutil.copy2(candidate, path)
-                break
-    if not path.is_file():
-        _bootstrap_approved_profile(path)
+            if candidate.is_file(): path.parent.mkdir(parents=True, exist_ok=True); shutil.copy2(candidate, path); break
+    if not path.is_file(): _bootstrap_approved_profile(path)
     profile = _repair_asset_paths(_coerce_profile(json.loads(path.read_text(encoding="utf-8"))))
     save_profile(profile, path)
     errors = profile.validate()
-    if errors:
-        raise ValueError("\n".join(errors))
+    if errors: raise ValueError("\n".join(errors))
     return profile
