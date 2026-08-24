@@ -12,7 +12,7 @@ def test_profile_for_package_wires_generated_assets_into_browser_profile(tmp_pat
         path.write_bytes(b"%PDF-1.4\n" + b"x" * 256)
 
     profile = SimpleNamespace(
-        resume_path="old_cv.pdf",
+        resume_path="old_cv.docx",
         cover_letter_path="old_cover.pdf",
         supporting_document_path="",
     )
@@ -23,6 +23,7 @@ def test_profile_for_package_wires_generated_assets_into_browser_profile(tmp_pat
     )
 
     browser_profile = profile_for_package(profile, package)
+    assert browser_profile.source_resume_path == "old_cv.docx"
     assert browser_profile.resume_path == str(cv)
     assert browser_profile.cover_letter_path == str(cover)
     assert browser_profile.supporting_document_path == str(support)
