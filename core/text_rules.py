@@ -21,31 +21,26 @@ def normalize_text(value: str | None) -> str:
 
 
 def sanitize_applicant_text(value: str | None) -> str:
-    """Enforce applicant facing punctuation rules.
-
-    Em dashes and en dashes are never allowed in generated CVs, cover letters,
-    application answers or other employer facing prose. They are converted to
-    commas. Ordinary hyphens are preserved because they can be meaningful in
-    names, dates and technical terms.
-    """
+    """Enforce dash free applicant facing prose."""
     text = value or ""
     text = re.sub(r"\s*[\u2013\u2014]\s*", ", ", text)
+    text = re.sub(r"\s*-\s*", " ", text)
     text = re.sub(r"\s+,\s*", ", ", text)
     text = re.sub(r",\s*,+", ",", text)
     return re.sub(r"[ \t]{2,}", " ", text).strip()
 
 
 def sanitize_user_filename(value: str | None, *, fallback: str = "document") -> str:
-    """Return a clean employer facing filename stem with no underscores or typographic dashes."""
+    """Return a clean employer facing filename stem with no underscores or dashes."""
     text = sanitize_applicant_text(value or "")
     text = text.replace("_", " ")
-    text = re.sub(r"[^A-Za-z0-9 .()&,+-]+", " ", text)
+    text = re.sub(r"[^A-Za-z0-9 .()&,+]+", " ", text)
     text = re.sub(r"\s+", " ", text).strip(" .")
     return text[:120] or fallback
 
 
 def has_forbidden_dashes(value: str | None) -> bool:
-    return any(character in (value or "") for character in ("\u2013", "\u2014"))
+    return any(character in (value or "") for character in ("-", "\u2013", "\u2014"))
 
 
 def has_forbidden_filename_separator(value: str | None) -> bool:
@@ -74,9 +69,7 @@ def matched_terms(
         occurrences = tuple(_pattern(term).finditer(normalized))
         if not occurrences:
             continue
-        if ignore_negated and all(
-            is_negated(normalized, match.start()) for match in occurrences
-        ):
+        if ignore_negated and all(is_negated(normalized, match.start()) for match in occurrences):
             continue
         matches.append(term)
     return tuple(matches)
@@ -86,10 +79,5 @@ def contains_term(text: str, term: str, *, ignore_negated: bool = True) -> bool:
     return bool(matched_terms(text, (term,), ignore_negated=ignore_negated))
 
 
-def contains_any(
-    text: str,
-    terms: Iterable[str],
-    *,
-    ignore_negated: bool = True,
-) -> bool:
+def contains_any(text: str, terms: Iterable[str], *, ignore_negated: bool = True) -> bool:
     return bool(matched_terms(text, terms, ignore_negated=ignore_negated))
