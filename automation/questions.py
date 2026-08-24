@@ -34,12 +34,12 @@ RESTRICTION_PATTERNS = (
 INTENT_ALIASES: tuple[tuple[Intent, tuple[str, ...]], ...] = (
     (Intent.FIRST_NAME, ("first name", "given name")), (Intent.MIDDLE_NAME, ("middle name", "middle initial")),
     (Intent.LAST_NAME, ("last name", "surname", "family name")), (Intent.FULL_NAME, ("full name", "candidate name", "your name")),
-    (Intent.EMAIL, ("email", "e-mail")), (Intent.PHONE, ("phone", "mobile", "telephone", "contact number")),
+    (Intent.EMAIL, ("email", "e mail")), (Intent.PHONE, ("phone", "mobile", "telephone", "contact number")),
     (Intent.CURRENT_COUNTRY, ("current country", "country of residence", "where are you currently based", "in which country do you currently work", "currently work")),
     (Intent.NATIONALITY, ("nationality", "citizenship", "citizen of")), (Intent.REGION, ("region", "geographic region")),
     (Intent.CITY, ("current city", "city", "location")), (Intent.ADDRESS, ("street address", "home address", "address")),
     (Intent.POSTAL_CODE, ("postal code", "postcode", "zip code")), (Intent.LINKEDIN, ("linkedin",)),
-    (Intent.WEBSITE, ("portfolio", "personal website", "website")), (Intent.UNIVERSITY, ("university", "institution", "school attended")),
+    (Intent.WEBSITE, ("portfolio", "personal website", "website")), (Intent.UNIVERSITY, ("university", "institution", "school attended", "education school")),
     (Intent.DEGREE, ("degree", "highest qualification", "education level")), (Intent.DISCIPLINE, ("discipline", "field of study", "major", "course of study")),
     (Intent.GRADUATION_YEAR, ("graduation year", "year graduated", "completion year")), (Intent.SPONSORSHIP, ("require sponsorship", "visa sponsorship", "sponsorship")),
     (Intent.WORK_AUTHORIZATION, ("work authorization", "work authorisation", "legally authorised", "legally authorized")),
@@ -55,7 +55,8 @@ DEMOGRAPHIC_TERMS = ("gender", "race", "ethnicity", "disability", "veteran", "se
 
 
 def normalize(text: str | None) -> str:
-    return " ".join((text or "").lower().split())
+    cleaned = re.sub(r"[_\-]+", " ", (text or "").lower())
+    return " ".join(cleaned.split())
 
 
 def _tokens(text: str) -> set[str]:
