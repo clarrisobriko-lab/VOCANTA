@@ -3,7 +3,14 @@ from core.models import Job
 
 
 def _job(description: str) -> Job:
-    return Job(company="Example", title="Executive Assistant", description=description, country="Remote", source="test", url="https://example.com/job")
+    return Job(
+        company="Example",
+        title="Executive Assistant",
+        location="Remote",
+        source="test",
+        url="https://example.com/job",
+        description=description,
+    )
 
 
 def test_manifest_maps_supported_and_missing_requirements():
