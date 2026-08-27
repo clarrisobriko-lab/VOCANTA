@@ -67,7 +67,7 @@ def restriction_reason(text: str) -> str:
     normalized = normalize(text)
     for pattern in RESTRICTION_PATTERNS:
         if re.search(pattern, normalized, flags=re.IGNORECASE):
-            return f"Employer declaration requires candidate review: {normalized[:220]}"
+            return f"Employer declaration requires candidate review and a personally authored response: {normalized[:220]}"
     return ""
 
 
