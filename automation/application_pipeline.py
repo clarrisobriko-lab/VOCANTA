@@ -10,6 +10,7 @@ from automation.package_builder import ApplicationPackage, build_application_pac
 from automation.profile import ApplicantProfile
 from automation.recovery import RecoveryAction, decide_recovery
 from automation.submission_evidence import build_submission_evidence, persist_submission_evidence
+from automation.submission_policy import reconcile_status, should_retry
 from automation.tailoring import TailoredDocuments, tailor_documents
 from automation.upload_hardening import validate_upload_path
 from core.models import Job
@@ -49,28 +50,35 @@ def validate_browser_documents(profile):
         if not valid: raise RuntimeError(f"Invalid supporting document upload: {reason}")
 
 
-_CONFIRMED_STATUSES = {"SUBMITTED", "SUCCESS", "AUTO_SUBMITTED", "CONFIRMED"}
-_AMBIGUOUS_STATUSES = {"UNKNOWN", "SUBMISSION_UNVERIFIED"}
-_HUMAN_STATUSES = {"HUMAN_REQUIRED", "HUMAN_VERIFICATION", "MANUAL_REQUIRED", "READY_TO_REVIEW"}
-
-
 def _engine(factory, profile, job_context):
     try: return factory(profile, job_context=job_context)
     except TypeError: return factory(profile)
 
 
 def _apply_with_recovery(job, job_id, profile, browser_engine_factory, *, max_attempts=3, sleep_fn=time.sleep):
-    last = None; title = getattr(job, "title", "") or ""; description = getattr(job, "description", "") or ""; job_context = "\n".join(x for x in (title, description) if x)
+    last = None
+    title = getattr(job, "title", "") or ""
+    description = getattr(job, "description", "") or ""
+    job_context = "\n".join(x for x in (title, description) if x)
     for attempt in range(1, max_attempts + 1):
-        try: last = _engine(browser_engine_factory, profile, job_context).apply(job.url, job_id)
-        except Exception as exc: decision = decide_recovery(str(exc), attempt, max_attempts)
+        try:
+            last = _engine(browser_engine_factory, profile, job_context).apply(job.url, job_id)
+        except Exception as exc:
+            decision = decide_recovery(str(exc), attempt, max_attempts)
         else:
-            status = (last.status or "").upper()
-            if status in _CONFIRMED_STATUSES or status in _AMBIGUOUS_STATUSES or status in _HUMAN_STATUSES or status == "SKIPPED_SOURCE": return last
+            reconciled = reconcile_status(last.status)
+            if reconciled in {"SUBMITTED", "UNKNOWN", "AUTH_REQUIRED", "READY_TO_REVIEW"} or (last.status or "").upper() == "SKIPPED_SOURCE":
+                return last
+            if not should_retry(last.status):
+                return last
             decision = decide_recovery(f"{last.status} {last.message}", attempt, max_attempts)
-        if decision.action == RecoveryAction.RETRY: sleep_fn(decision.delay_seconds); continue
-        if decision.action == RecoveryAction.REQUEUE: return last or AutomationResult("REQUEUE", decision.reason, "", 0)
-        if decision.action == RecoveryAction.HUMAN_REQUIRED: return last or AutomationResult("HUMAN_REQUIRED", decision.reason, "", 0)
+        if decision.action == RecoveryAction.RETRY:
+            sleep_fn(decision.delay_seconds)
+            continue
+        if decision.action == RecoveryAction.REQUEUE:
+            return last or AutomationResult("REQUEUE", decision.reason, "", 0)
+        if decision.action == RecoveryAction.HUMAN_REQUIRED:
+            return last or AutomationResult("HUMAN_REQUIRED", decision.reason, "", 0)
         return last or AutomationResult("FAILED", decision.reason, "", 0)
     return last or AutomationResult("FAILED", "application retry budget exhausted", "", 0)
 
