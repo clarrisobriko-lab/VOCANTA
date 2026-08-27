@@ -6,23 +6,20 @@ from automation.submission_policy import policy_for_url, reconcile_status, shoul
 @pytest.mark.parametrize("url,name", [
     ("https://boards.greenhouse.io/example/jobs/1", "GREENHOUSE"),
     ("https://jobs.lever.co/example/1", "LEVER"),
+    ("https://jobs.ashbyhq.com/example/1", "ASHBY"),
+    ("https://jobs.smartrecruiters.com/example/1", "SMARTRECRUITERS"),
+    ("https://example.wd5.myworkdayjobs.com/job/1", "WORKDAY"),
 ])
-def test_validated_adapters_may_auto_submit(url, name):
+def test_production_adapters_preserve_auto_submit_capability(url, name):
     policy = policy_for_url(url)
     assert policy.adapter.name == name
     assert policy.may_auto_submit is True
     assert policy.requires_review is False
 
 
-@pytest.mark.parametrize("url,name", [
-    ("https://jobs.ashbyhq.com/example/1", "ASHBY"),
-    ("https://jobs.smartrecruiters.com/example/1", "SMARTRECRUITERS"),
-    ("https://example.wd5.myworkdayjobs.com/job/1", "WORKDAY"),
-    ("https://careers.example.com/job/1", "GENERIC"),
-])
-def test_unvalidated_adapters_remain_review_only(url, name):
-    policy = policy_for_url(url)
-    assert policy.adapter.name == name
+def test_generic_adapter_remains_review_only():
+    policy = policy_for_url("https://careers.example.com/job/1")
+    assert policy.adapter.name == "GENERIC"
     assert policy.may_auto_submit is False
     assert policy.requires_review is True
 
