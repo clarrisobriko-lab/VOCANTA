@@ -25,20 +25,20 @@ class ATSAdapter:
 ADAPTERS = (
     ATSAdapter("GREENHOUSE", ("greenhouse.io", "greenhouse.com"), ("submit application", "submit"), STANDARD_CONFIRMATIONS, True),
     ATSAdapter("LEVER", ("lever.co",), ("submit application", "submit"), STANDARD_CONFIRMATIONS, True),
-    ATSAdapter("ASHBY", ("ashbyhq.com",), ("submit application", "submit"), STANDARD_CONFIRMATIONS + ("application received", "we'll be in touch"), True),
+    ATSAdapter("ASHBY", ("ashbyhq.com",), ("submit application", "submit"), STANDARD_CONFIRMATIONS + ("application received", "we'll be in touch"), False),
     ATSAdapter(
         "SMARTRECRUITERS",
         ("smartrecruiters.com",),
         ("submit application", "send application", "apply"),
         STANDARD_CONFIRMATIONS + ("application successfully submitted", "your application has been submitted"),
-        True,
+        False,
     ),
     ATSAdapter(
         "WORKDAY",
         ("workday.com", "myworkdayjobs.com"),
         ("submit", "submit application"),
         STANDARD_CONFIRMATIONS + ("your application was submitted", "your application has been submitted"),
-        True,
+        False,
     ),
 )
 
