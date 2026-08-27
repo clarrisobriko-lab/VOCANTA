@@ -5,8 +5,6 @@ from dataclasses import dataclass
 from automation.ats import ATSAdapter, adapter_for_url
 
 
-AUTO_SUBMIT_ADAPTERS = frozenset({"GREENHOUSE", "LEVER"})
-REVIEW_ONLY_ADAPTERS = frozenset({"ASHBY", "SMARTRECRUITERS", "WORKDAY", "GENERIC"})
 TERMINAL_NO_RETRY = frozenset({"SUBMITTED", "SUCCESS", "AUTO_SUBMITTED", "CONFIRMED", "UNKNOWN", "SUBMISSION_UNVERIFIED"})
 
 
@@ -20,9 +18,9 @@ class SubmissionPolicy:
 
 def policy_for_url(url: str) -> SubmissionPolicy:
     adapter = adapter_for_url(url)
-    if adapter.name in AUTO_SUBMIT_ADAPTERS:
-        return SubmissionPolicy(adapter, True, False, "validated ATS adapter may auto submit")
-    return SubmissionPolicy(adapter, False, True, "ATS requires review before final submission")
+    if adapter.auto_submit_allowed:
+        return SubmissionPolicy(adapter, True, False, "production ATS adapter may auto submit")
+    return SubmissionPolicy(adapter, False, True, "unverified ATS requires review before final submission")
 
 
 def reconcile_status(status: str) -> str:
