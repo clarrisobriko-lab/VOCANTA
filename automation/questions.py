@@ -47,7 +47,7 @@ INTENT_ALIASES: tuple[tuple[Intent, tuple[str, ...]], ...] = (
     (Intent.TRAVEL, ("travel commitment", "willing to travel", "international travel", "able to commit to this")),
     (Intent.EMPLOYER_COUNT, ("number of employers", "how many employers", "previous employers", "how many companies have you worked for")),
     (Intent.NOTICE_PERIOD, ("notice period", "when can you start", "availability")),
-    (Intent.SALARY, ("salary expectation", "expected salary", "desired salary", "compensation expectation")),
+    (Intent.SALARY, ("salary expectation", "salary expectations", "expected salary", "desired salary", "salary requirement", "salary requirements", "compensation expectation", "compensation expectations", "expected compensation", "desired compensation", "pay expectation", "pay expectations", "hourly rate", "expected rate", "desired rate")),
     (Intent.PRIVACY_ACKNOWLEDGEMENT, ("privacy notice", "privacy policy", "data processing", "acknowledge", "read and agree")),
 )
 
