@@ -35,14 +35,14 @@ INTENT_ALIASES: tuple[tuple[Intent, tuple[str, ...]], ...] = (
     (Intent.FIRST_NAME, ("first name", "given name")), (Intent.MIDDLE_NAME, ("middle name", "middle initial")),
     (Intent.LAST_NAME, ("last name", "surname", "family name")), (Intent.FULL_NAME, ("full name", "candidate name", "your name")),
     (Intent.EMAIL, ("email", "e mail")), (Intent.PHONE, ("phone", "mobile", "telephone", "contact number")),
-    (Intent.CURRENT_COUNTRY, ("current country", "country of residence", "where are you currently based", "in which country do you currently work", "currently work")),
+    (Intent.CURRENT_COUNTRY, ("current country", "country of residence", "where are you currently based", "in which country do you currently work")),
     (Intent.NATIONALITY, ("nationality", "citizenship", "citizen of")), (Intent.REGION, ("region", "geographic region")),
     (Intent.CITY, ("current city", "city", "location")), (Intent.ADDRESS, ("street address", "home address", "address")),
     (Intent.POSTAL_CODE, ("postal code", "postcode", "zip code")), (Intent.LINKEDIN, ("linkedin",)),
     (Intent.WEBSITE, ("portfolio", "personal website", "website")), (Intent.UNIVERSITY, ("university", "institution", "school attended", "education school")),
     (Intent.DEGREE, ("degree", "highest qualification", "education level")), (Intent.DISCIPLINE, ("discipline", "field of study", "major", "course of study")),
     (Intent.GRADUATION_YEAR, ("graduation year", "year graduated", "completion year")), (Intent.SPONSORSHIP, ("require sponsorship", "visa sponsorship", "sponsorship")),
-    (Intent.WORK_AUTHORIZATION, ("work authorization", "work authorisation", "legally authorised", "legally authorized")),
+    (Intent.WORK_AUTHORIZATION, ("work authorization", "work authorisation", "legally authorised", "legally authorized", "authorised to work", "authorized to work", "eligible to work")),
     (Intent.RELOCATION, ("relocate", "relocation")), (Intent.REMOTE_PREFERENCE, ("remote preference", "remote work")),
     (Intent.TRAVEL, ("travel commitment", "willing to travel", "international travel", "able to commit to this")),
     (Intent.EMPLOYER_COUNT, ("number of employers", "how many employers", "previous employers", "how many companies have you worked for")),
@@ -76,6 +76,7 @@ def identify_intent(label: str) -> Intent:
     if normalized == "school": return Intent.UNIVERSITY
     if normalized == "degree": return Intent.DEGREE
     if normalized == "discipline": return Intent.DISCIPLINE
+    if normalized in {"country", "country region", "country or region", "current location country"}: return Intent.CURRENT_COUNTRY
     if any(term in normalized for term in DEMOGRAPHIC_TERMS): return Intent.DEMOGRAPHIC
     for intent, aliases in INTENT_ALIASES:
         if any(alias == normalized or alias in normalized for alias in aliases): return intent
