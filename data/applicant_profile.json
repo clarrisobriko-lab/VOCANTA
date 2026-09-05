@@ -13,7 +13,7 @@
   "work_authorization": "No, I require employer sponsorship",
   "requires_sponsorship": true,
   "notice_period": "Available immediately",
-  "salary_expectation": "$7.00 per hour",
+  "salary_expectation": "7.00",
   "nationality": "Nigerian",
   "region": "Africa",
   "current_location": "Abuja, Nigeria",
@@ -65,10 +65,14 @@
   ],
   "standard_answers": {
     "how_did_you_hear": "LinkedIn",
-    "introductory_video_url": ""
+    "introductory_video_url": "",
+    "salary expectations": "$7.00 per hour"
   },
-  "demographics": {},
-  "auto_fill_demographics": false,
+  "demographics": {
+    "gender": "Female",
+    "race": "Black or African American"
+  },
+  "auto_fill_demographics": true,
   "privacy_acknowledgements": true,
   "resume_path": "data/Clarris_Obriko_CV.pdf",
   "cover_letter_path": "",
