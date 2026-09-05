@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
+from dataclasses import replace
 from datetime import datetime, timezone
 from urllib.parse import urlparse
 
@@ -10,8 +12,11 @@ from playwright.sync_api import sync_playwright
 from automation.ashby import fill_ashby_application
 from automation.ats import adapter_for_url
 from automation.forms import fill_application_form
+from automation.live_test_target import PERMITFLOW_ADMINISTRATIVE_ASSISTANT, canonical_url
 from automation.profile import load_profile
+from automation.tailoring import tailor_documents
 from config.settings import AUTOMATION_SCREENSHOT_DIR, BROWSER_PROFILE_DIR
+from core.models import Job
 
 
 def _safe_name(url: str) -> str:
@@ -29,13 +34,53 @@ def _wait_for_application_controls(page) -> None:
     page.wait_for_timeout(1000)
 
 
+def _job_from_live_page(page, requested_url: str) -> Job:
+    body = ""
+    try:
+        body = page.locator("body").inner_text(timeout=5000)
+    except Exception:
+        pass
+
+    if canonical_url(requested_url) == canonical_url(PERMITFLOW_ADMINISTRATIVE_ASSISTANT.application_url):
+        company = PERMITFLOW_ADMINISTRATIVE_ASSISTANT.employer
+        title = PERMITFLOW_ADMINISTRATIVE_ASSISTANT.title
+    else:
+        company = urlparse(page.url).netloc.replace("www.", "")
+        try:
+            title = page.locator("h1").first.inner_text(timeout=2000).strip()
+        except Exception:
+            title = page.title().strip() or "Application"
+
+    return Job(
+        company=company,
+        title=title,
+        location="Remote",
+        source=adapter_for_url(page.url).name,
+        url=page.url,
+        description=body,
+    )
+
+
+def _rehearsal_job_id(url: str) -> int:
+    return int(hashlib.sha256(url.encode("utf-8")).hexdigest()[:8], 16)
+
+
+def _profile_with_tailored_documents(profile, documents):
+    return replace(
+        profile,
+        resume_path=str(documents.resume_path),
+        cover_letter_path=str(documents.cover_letter_path),
+        supporting_document_path=str(documents.certificate_path) if documents.certificate_path else "",
+    )
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Populate a real job application from the VOCANTA profile without submitting it.")
     parser.add_argument("url", help="Direct application URL on a supported ATS")
     parser.add_argument("--headless", action="store_true", help="Run without showing the browser")
     args = parser.parse_args()
 
-    profile = load_profile()
+    base_profile = load_profile()
     AUTOMATION_SCREENSHOT_DIR.mkdir(parents=True, exist_ok=True)
     BROWSER_PROFILE_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -54,11 +99,17 @@ def main() -> int:
         try:
             page.goto(args.url, wait_until="domcontentloaded", timeout=60000)
             _wait_for_application_controls(page)
+
             adapter = adapter_for_url(page.url)
+            job = _job_from_live_page(page, args.url)
+            documents = tailor_documents(job, _rehearsal_job_id(args.url), base_profile)
+            profile = _profile_with_tailored_documents(base_profile, documents)
+            job_context = f"{job.title}\n{job.description}"
+
             result = (
-                fill_ashby_application(page, profile, adapter.final_submit_texts)
+                fill_ashby_application(page, profile, adapter.final_submit_texts, job_context=job_context)
                 if adapter.name == "ASHBY"
-                else fill_application_form(page, profile, adapter.final_submit_texts)
+                else fill_application_form(page, profile, adapter.final_submit_texts, job_context=job_context)
             )
             page.wait_for_timeout(750)
             page.screenshot(path=str(screenshot_path), full_page=True)
@@ -67,6 +118,12 @@ def main() -> int:
                 "requested_url": args.url,
                 "final_url": page.url,
                 "ats": adapter.name,
+                "company": job.company,
+                "title": job.title,
+                "tailoring_category": documents.category,
+                "tailored_resume": str(documents.resume_path),
+                "tailored_cover_letter": str(documents.cover_letter_path),
+                "resume_is_tailored": str(profile.resume_path) == str(documents.resume_path),
                 "fields_detected": result.fields_detected,
                 "fields_filled": result.filled,
                 "cv_uploaded": result.cv_uploaded,
@@ -81,6 +138,9 @@ def main() -> int:
 
             print("VOCANTA AUTOFILL REHEARSAL: COMPLETE")
             print(f"ATS: {adapter.name}")
+            print(f"Job: {job.company} | {job.title}")
+            print(f"Tailored CV: {documents.resume_path}")
+            print(f"Tailored cover letter: {documents.cover_letter_path}")
             print(f"Fields detected: {result.fields_detected}")
             print(f"Fields filled: {result.filled}")
             print(f"CV uploaded: {result.cv_uploaded}")
