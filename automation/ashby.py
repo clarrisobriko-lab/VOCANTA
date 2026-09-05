@@ -113,6 +113,7 @@ def _ashby_fill_text(page: Any, profile: ApplicantProfile) -> int:
 
 
 def _select_in_question(page: Any, question_fragment: str, answer: str) -> int:
+    if not answer: return 0
     candidates = page.locator("div").filter(has_text=question_fragment); best = None; best_len = 10**9
     for index in range(min(candidates.count(), 50)):
         container = candidates.nth(index)
@@ -130,10 +131,25 @@ def _select_in_question(page: Any, question_fragment: str, answer: str) -> int:
     except Exception: return 0
 
 
+def _approved_race_answers(profile: ApplicantProfile) -> tuple[str, ...]:
+    stored = str(profile.demographics.get("race", "") or "").strip()
+    if not stored: return ()
+    if normalize(stored).startswith("black or african american"):
+        return ("Black or African American (Not Hispanic or Latino)", stored)
+    return (stored,)
+
+
 def _ashby_binary_answers(page: Any, profile: ApplicantProfile) -> int:
     filled = _select_in_question(page, "available for full time work", "Yes")
     filled += _select_in_question(page, "willingness to adhere to this schedule", "Yes")
     if profile.privacy_acknowledgements: filled += _select_in_question(page, "recruitment process includes questions", "Yes")
+    if profile.auto_fill_demographics:
+        gender = str(profile.demographics.get("gender", "") or "").strip()
+        if gender: filled += _select_in_question(page, "gender", gender)
+        for race in _approved_race_answers(profile):
+            selected = _select_in_question(page, "race", race)
+            filled += selected
+            if selected: break
     return filled
 
 
