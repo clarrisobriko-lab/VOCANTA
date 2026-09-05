@@ -3,16 +3,18 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
-from dataclasses import replace
 from datetime import datetime, timezone
 from urllib.parse import urlparse
 
 from playwright.sync_api import sync_playwright
 
+from agents.scorer import Scorer
+from automation.application_pipeline import profile_for_package
 from automation.ashby import fill_ashby_application
 from automation.ats import adapter_for_url
 from automation.forms import fill_application_form
 from automation.live_test_target import PERMITFLOW_ADMINISTRATIVE_ASSISTANT, canonical_url
+from automation.package_builder import build_application_package
 from automation.profile import load_profile
 from automation.tailoring import tailor_documents
 from config.settings import AUTOMATION_SCREENSHOT_DIR, BROWSER_PROFILE_DIR
@@ -65,13 +67,12 @@ def _rehearsal_job_id(url: str) -> int:
     return int(hashlib.sha256(url.encode("utf-8")).hexdigest()[:8], 16)
 
 
-def _profile_with_tailored_documents(profile, documents):
-    return replace(
-        profile,
-        resume_path=str(documents.resume_path),
-        cover_letter_path=str(documents.cover_letter_path),
-        supporting_document_path=str(documents.certificate_path) if documents.certificate_path else "",
-    )
+def _prepare_tailored_profile(job: Job, job_id: int, base_profile):
+    decision = Scorer().evaluate(job)
+    documents = tailor_documents(job, job_id, base_profile)
+    package = build_application_package(job, documents, decision)
+    browser_profile = profile_for_package(base_profile, package)
+    return decision, documents, package, browser_profile
 
 
 def main() -> int:
@@ -102,8 +103,11 @@ def main() -> int:
 
             adapter = adapter_for_url(page.url)
             job = _job_from_live_page(page, args.url)
-            documents = tailor_documents(job, _rehearsal_job_id(args.url), base_profile)
-            profile = _profile_with_tailored_documents(base_profile, documents)
+            decision, documents, package, profile = _prepare_tailored_profile(
+                job,
+                _rehearsal_job_id(args.url),
+                base_profile,
+            )
             job_context = f"{job.title}\n{job.description}"
 
             result = (
@@ -121,9 +125,12 @@ def main() -> int:
                 "company": job.company,
                 "title": job.title,
                 "tailoring_category": documents.category,
-                "tailored_resume": str(documents.resume_path),
-                "tailored_cover_letter": str(documents.cover_letter_path),
-                "resume_is_tailored": str(profile.resume_path) == str(documents.resume_path),
+                "tailored_resume_docx": str(documents.resume_path),
+                "tailored_cover_letter_docx": str(documents.cover_letter_path),
+                "uploaded_resume_pdf": str(package.cv_pdf),
+                "uploaded_cover_letter_pdf": str(package.cover_letter_pdf),
+                "resume_is_tailored_package": str(profile.resume_path) == str(package.cv_pdf),
+                "application_score": decision.score,
                 "fields_detected": result.fields_detected,
                 "fields_filled": result.filled,
                 "cv_uploaded": result.cv_uploaded,
@@ -139,8 +146,9 @@ def main() -> int:
             print("VOCANTA AUTOFILL REHEARSAL: COMPLETE")
             print(f"ATS: {adapter.name}")
             print(f"Job: {job.company} | {job.title}")
-            print(f"Tailored CV: {documents.resume_path}")
-            print(f"Tailored cover letter: {documents.cover_letter_path}")
+            print(f"Tailored CV source: {documents.resume_path}")
+            print(f"Employer upload CV: {package.cv_pdf}")
+            print(f"Employer upload cover letter: {package.cover_letter_pdf}")
             print(f"Fields detected: {result.fields_detected}")
             print(f"Fields filled: {result.filled}")
             print(f"CV uploaded: {result.cv_uploaded}")
