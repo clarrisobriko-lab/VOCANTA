@@ -57,25 +57,37 @@ class FormProfileResolver:
             for alias in aliases
         )
 
+    @staticmethod
+    def _best_alias_match(label: str, alias_map: dict[str, tuple[str, ...]]) -> str:
+        normalized = _normalize(label)
+        candidates: list[tuple[int, str]] = []
+        for kind, aliases in alias_map.items():
+            for alias in aliases:
+                if (
+                    alias == normalized
+                    or normalized.startswith(f"{alias} ")
+                    or normalized.endswith(f" {alias}")
+                    or f" {alias} " in normalized
+                ):
+                    candidates.append((len(alias), kind))
+        if not candidates:
+            return ""
+        candidates.sort(reverse=True)
+        return candidates[0][1]
+
     def _employment_kind(self, label: str) -> str:
         normalized = _normalize(label)
         if any(term in normalized for term in ("education", "school", "university", "degree", "qualification")):
             return ""
         if any(marker in normalized for marker in self.NARRATIVE_MARKERS):
             return ""
-        for kind, aliases in self.EMPLOYMENT_ALIASES.items():
-            if self._matches(normalized, aliases):
-                return kind
-        return ""
+        return self._best_alias_match(normalized, self.EMPLOYMENT_ALIASES)
 
     def _education_kind(self, label: str) -> str:
         normalized = _normalize(label)
         if any(marker in normalized for marker in self.NARRATIVE_MARKERS):
             return ""
-        for kind, aliases in self.EDUCATION_ALIASES.items():
-            if self._matches(normalized, aliases):
-                return kind
-        return ""
+        return self._best_alias_match(normalized, self.EDUCATION_ALIASES)
 
     def resolve(self, label: str) -> ResolvedField | None:
         employment_kind = self._employment_kind(label)
