@@ -14,6 +14,8 @@ from config.settings import (
     PACKAGED_MASTER_CV_FILE,
 )
 
+CANONICAL_PROFILE_FILE = Path(__file__).resolve().parent.parent / "data" / "applicant_profile.json"
+
 
 @dataclass(frozen=True, slots=True)
 class EducationRecord:
@@ -142,7 +144,7 @@ def _legacy_profile_candidates() -> list[Path]:
 
 
 def _bootstrap_approved_profile(path: Path) -> None:
-    save_profile(ApplicantProfile(first_name="Clarris", middle_name="Phegor", last_name="Obriko", email="Clarrisobriko@gmail.com", phone="+2348055632432", city="Abuja", country="Nigeria", address="20 IW Osisiogwu Crescent, Utako", postal_code="900108", linkedin_url="https://www.linkedin.com/in/phegor-clarris-obriko-880b81104", website_url="", work_authorization="No, I require employer sponsorship", requires_sponsorship=True, notice_period="Immediately available", salary_expectation="", source_resume_path=str(MASTER_CV_FILE)), path)
+    save_profile(ApplicantProfile(first_name="Clarris", middle_name="Phegor", last_name="Obriko", email="phegclarris@gmail.com", phone="+2348055632432", city="Abuja", country="Nigeria", address="Abuja, Nigeria", postal_code="900106", linkedin_url="https://www.linkedin.com/in/clarris-obriko-880b81104", website_url="", work_authorization="No, I require employer sponsorship", requires_sponsorship=True, notice_period="Available immediately", salary_expectation="7.00", demographics={"gender": "Female", "race": "Black or African American"}, auto_fill_demographics=True, standard_answers={"how_did_you_hear": "LinkedIn", "salary_expectation": "$7.00 per hour"}, source_resume_path=str(MASTER_CV_FILE)), path)
 
 
 def _repair_asset_paths(profile: ApplicantProfile) -> ApplicantProfile:
@@ -166,13 +168,31 @@ def _coerce_profile(data: dict) -> ApplicantProfile:
     return ApplicantProfile(**data)
 
 
+def _sync_canonical_profile(profile: ApplicantProfile) -> ApplicantProfile:
+    if not CANONICAL_PROFILE_FILE.is_file():
+        return profile
+    canonical_data = json.loads(CANONICAL_PROFILE_FILE.read_text(encoding="utf-8"))
+    merged = _profile_payload(profile)
+    protected_paths = {"source_resume_path", "resume_path", "cover_letter_path", "supporting_document_path"}
+    for key, value in canonical_data.items():
+        if key in protected_paths:
+            continue
+        if key == "standard_answers":
+            merged[key] = {**dict(profile.standard_answers), **dict(value or {})}
+        else:
+            merged[key] = value
+    return _coerce_profile(merged)
+
+
 def load_profile(path: Path = APPLICANT_PROFILE_FILE) -> ApplicantProfile:
     ensure_persistent_assets()
     if not path.is_file():
         for candidate in _legacy_profile_candidates():
             if candidate.is_file(): path.parent.mkdir(parents=True, exist_ok=True); shutil.copy2(candidate, path); break
     if not path.is_file(): _bootstrap_approved_profile(path)
-    profile = _repair_asset_paths(_coerce_profile(json.loads(path.read_text(encoding="utf-8"))))
+    profile = _coerce_profile(json.loads(path.read_text(encoding="utf-8")))
+    profile = _sync_canonical_profile(profile)
+    profile = _repair_asset_paths(profile)
     save_profile(profile, path)
     errors = profile.validate()
     if errors: raise ValueError("\n".join(errors))
