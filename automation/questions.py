@@ -76,7 +76,7 @@ def identify_intent(label: str) -> Intent:
     if normalized == "school": return Intent.UNIVERSITY
     if normalized == "degree": return Intent.DEGREE
     if normalized == "discipline": return Intent.DISCIPLINE
-    if normalized in {"country", "country region", "country or region", "current location country"}: return Intent.CURRENT_COUNTRY
+    if normalized in {"country", "country / region", "country region", "country or region", "current location country"}: return Intent.CURRENT_COUNTRY
     if any(term in normalized for term in DEMOGRAPHIC_TERMS): return Intent.DEMOGRAPHIC
     for intent, aliases in INTENT_ALIASES:
         if any(alias == normalized or alias in normalized for alias in aliases): return intent
