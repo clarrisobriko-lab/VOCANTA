@@ -2,6 +2,7 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import autofill_rehearsal as rehearsal
+from automation.ashby import _approved_race_answers, _hourly_rate
 from core.models import Job
 
 
@@ -57,3 +58,15 @@ def test_prepare_tailored_profile_uses_application_package(monkeypatch):
 def test_permitflow_rehearsal_job_id_is_stable():
     url = "https://jobs.ashbyhq.com/permitflow/5b94082e-94f4-46ba-8e21-cfe238e8eae0/application"
     assert rehearsal._rehearsal_job_id(url) == rehearsal._rehearsal_job_id(url)
+
+
+def test_ashby_restores_approved_race_label_alias():
+    profile = SimpleNamespace(demographics={"race": "Black or African American"})
+    answers = _approved_race_answers(profile)
+    assert answers[0] == "Black or African American (Not Hispanic or Latino)"
+    assert "Black or African American" in answers
+
+
+def test_ashby_hourly_rate_uses_approved_salary_value():
+    profile = SimpleNamespace(salary_expectation="7.00")
+    assert _hourly_rate(profile) == "7"
