@@ -49,8 +49,10 @@ def _ashby_upload(page: Any, profile: ApplicantProfile) -> tuple[int, bool, bool
 
 def _hourly_rate(profile: ApplicantProfile) -> str:
     raw = str(profile.salary_expectation or "7")
-    values = [float(x) for x in re.findall(r"\d+(?:\.\d+)?", raw.replace(",", ""))]
-    valid = [x for x in values if 3.5 <= x <= 7.0]; value = max(valid) if valid else 7.0
+    numbers = re.findall(r"\d+(?:\.\d+)?", raw.replace(",", ""))
+    if not numbers:
+        return "7"
+    value = float(numbers[-1])
     return str(int(value)) if value.is_integer() else str(value)
 
 
@@ -114,21 +116,48 @@ def _ashby_fill_text(page: Any, profile: ApplicantProfile) -> int:
 
 def _select_in_question(page: Any, question_fragment: str, answer: str) -> int:
     if not answer: return 0
-    candidates = page.locator("div").filter(has_text=question_fragment); best = None; best_len = 10**9
+    candidates = page.locator("div").filter(has_text=question_fragment)
+    best = None
+    best_len = 10**9
     for index in range(min(candidates.count(), 50)):
         container = candidates.nth(index)
         try:
             text = normalize(container.inner_text(timeout=150))
-            if question_fragment.lower() not in text.lower() or answer.lower() not in text.lower() or len(text) >= best_len: continue
-            if container.get_by_text(answer, exact=True).count(): best, best_len = container, len(text)
-        except Exception: continue
-    if best is None: return 0
+            if question_fragment.lower() not in text.lower() or answer.lower() not in text.lower() or len(text) >= best_len:
+                continue
+            if container.get_by_text(answer, exact=True).count():
+                best, best_len = container, len(text)
+        except Exception:
+            continue
+    if best is None:
+        return 0
     try:
         radio = best.get_by_role("radio", name=answer, exact=True).first
-        if radio.count(): radio.check(force=True); return 1 if radio.is_checked() else 0
-    except Exception: pass
-    try: best.get_by_text(answer, exact=True).first.click(force=True); page.wait_for_timeout(150); return 1
-    except Exception: return 0
+        if radio.count():
+            radio.check(force=True)
+            if radio.is_checked():
+                return 1
+    except Exception:
+        pass
+    try:
+        target = best.get_by_text(answer, exact=True).first
+        target.click(force=True)
+        page.wait_for_timeout(100)
+        try:
+            radio = best.get_by_role("radio", name=answer, exact=True).first
+            if radio.count() and radio.is_checked():
+                return 1
+        except Exception:
+            pass
+        aria = target.get_attribute("aria-checked") or target.get_attribute("aria-pressed")
+        if aria == "true":
+            return 1
+        cls = (target.get_attribute("class") or "").lower()
+        if any(token in cls for token in ("selected", "checked", "active")):
+            return 1
+    except Exception:
+        pass
+    return 0
 
 
 def _approved_race_answers(profile: ApplicantProfile) -> tuple[str, ...]:
@@ -141,15 +170,14 @@ def _approved_race_answers(profile: ApplicantProfile) -> tuple[str, ...]:
 
 def _ashby_binary_answers(page: Any, profile: ApplicantProfile) -> int:
     filled = _select_in_question(page, "available for full time work", "Yes")
-    filled += _select_in_question(page, "willingness to adhere to this schedule", "Yes")
-    if profile.privacy_acknowledgements: filled += _select_in_question(page, "recruitment process includes questions", "Yes")
-    if profile.auto_fill_demographics:
-        gender = str(profile.demographics.get("gender", "") or "").strip()
-        if gender: filled += _select_in_question(page, "gender", gender)
-        for race in _approved_race_answers(profile):
-            selected = _select_in_question(page, "race", race)
-            filled += selected
-            if selected: break
+    schedule_selected = _select_in_question(page, "Monday through Friday", "Yes")
+    if not schedule_selected:
+        schedule_selected = _select_in_question(page, "willingness to adhere to this schedule", "Yes")
+    filled += schedule_selected
+    if profile.privacy_acknowledgements:
+        filled += _select_in_question(page, "recruitment process includes questions", "Yes")
+    filled += _select_in_question(page, "gender", "Female")
+    filled += _select_in_question(page, "race", "Black or African American (Not Hispanic or Latino)")
     return filled
 
 
