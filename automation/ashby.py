@@ -50,7 +50,10 @@ def _ashby_upload(page: Any, profile: ApplicantProfile) -> tuple[int, bool, bool
 def _hourly_rate(profile: ApplicantProfile) -> str:
     raw = str(profile.salary_expectation or "7")
     numbers = re.findall(r"\d+(?:\.\d+)?", raw.replace(",", ""))
-    return numbers[-1] if numbers else "7"
+    if not numbers:
+        return "7"
+    value = float(numbers[-1])
+    return str(int(value)) if value.is_integer() else str(value)
 
 
 def _answer_for(label: str, profile: ApplicantProfile) -> str:
